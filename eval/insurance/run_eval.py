@@ -20,10 +20,13 @@ metric is checkable against ground truth mined from the corpus glossaries:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import pathlib
 import re
+import threading
+import time
 
 import requests
 
@@ -66,15 +69,42 @@ def _load(path: pathlib.Path) -> list[dict]:
 
 
 class LightRAGClient:
-    def __init__(self, base: str, mode: str, top_k: int, timeout: int = 600):
+    def __init__(
+        self,
+        base: str,
+        mode: str,
+        top_k: int,
+        timeout: int = 600,
+        response_type: str | None = None,
+        max_total_tokens: int | None = None,
+        max_entity_tokens: int | None = None,
+        max_relation_tokens: int | None = None,
+        query_top_k: int | None = None,
+    ):
         self.base = base.rstrip("/")
         self.mode = mode
         self.top_k = top_k
         self.timeout = timeout
-        self.session = requests.Session()
-        api_key = os.getenv("LIGHTRAG_API_KEY")
-        if api_key:
-            self.session.headers["X-API-Key"] = api_key
+        # Optional context-budget / output controls. The defaults (None) leave LightRAG's
+        # server-side defaults untouched; setting them shrinks the prompt prefill (the
+        # dominant generation cost) and/or the answer length, speeding queries up markedly.
+        self.response_type = response_type
+        self.max_total_tokens = max_total_tokens
+        self.max_entity_tokens = max_entity_tokens
+        self.max_relation_tokens = max_relation_tokens
+        self.query_top_k = query_top_k
+        # One session per thread — requests.Session isn't guaranteed thread-safe.
+        self._local = threading.local()
+        self._api_key = os.getenv("LIGHTRAG_API_KEY")
+
+    def _session(self) -> requests.Session:
+        s = getattr(self._local, "session", None)
+        if s is None:
+            s = requests.Session()
+            if self._api_key:
+                s.headers["X-API-Key"] = self._api_key
+            self._local.session = s
+        return s
 
     def answer(self, query: str) -> dict:
         """Return {answer, refused, references:[{file, texts:[...]}]}.
@@ -89,10 +119,34 @@ class LightRAGClient:
             "include_references": True,
             "include_chunk_content": True,
         }
-        resp = self.session.post(
-            f"{self.base}/query", json=payload, timeout=self.timeout
-        )
-        resp.raise_for_status()
+        if self.response_type:
+            payload["response_type"] = self.response_type
+        if self.max_total_tokens:
+            payload["max_total_tokens"] = self.max_total_tokens
+        if self.max_entity_tokens:
+            payload["max_entity_tokens"] = self.max_entity_tokens
+        if self.max_relation_tokens:
+            payload["max_relation_tokens"] = self.max_relation_tokens
+        if self.query_top_k:
+            payload["top_k"] = self.query_top_k
+
+        # The LLM backend (llama.cpp via llama-swap) has a fixed number of parallel slots
+        # and returns 429/503 when saturated. Under concurrency, retry those a few times
+        # with backoff rather than recording a spurious failure.
+        last_exc: Exception | None = None
+        for attempt in range(4):
+            resp = self._session().post(
+                f"{self.base}/query", json=payload, timeout=self.timeout
+            )
+            if resp.status_code in (429, 503):
+                last_exc = requests.HTTPError(f"{resp.status_code} backpressure")
+                time.sleep(2 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            break
+        else:
+            raise last_exc or RuntimeError("query failed after retries")
+
         data = resp.json()
         answer = data.get("response", "") or ""
         answer_norm = _norm(answer)
@@ -108,18 +162,39 @@ class LightRAGClient:
         return {"answer": answer, "refused": refused, "references": refs}
 
 
-def run(client: LightRAGClient, dataset_path: pathlib.Path = DATASET) -> dict:
+def run(
+    client: LightRAGClient,
+    dataset_path: pathlib.Path = DATASET,
+    workers: int = 1,
+) -> dict:
     cases = _load(dataset_path)
     agg: dict[str, list[bool]] = {
         k: [] for k in ["retrieval", "citation", "faithfulness", "answered", "refusal"]
     }
     failures: list[str] = []
 
-    for c in cases:
-        q = c["q"]
+    # Fan out the (independent) queries across `workers` threads, then aggregate the
+    # results in dataset order so scoring stays deterministic regardless of completion order.
+    t0 = time.time()
+    results: list[tuple[dict, dict | None, Exception | None]] = [None] * len(cases)  # type: ignore
+
+    def _work(i: int, c: dict):
         try:
-            r = client.answer(q)
-        except Exception as e:  # noqa: BLE001 — endpoint error → record as failure, keep going
+            return i, c, client.answer(c["q"]), None
+        except Exception as e:  # noqa: BLE001 — record and keep going
+            return i, c, None, e
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        for fut in concurrent.futures.as_completed(
+            ex.submit(_work, i, c) for i, c in enumerate(cases)
+        ):
+            i, c, r, e = fut.result()
+            results[i] = (c, r, e)
+    elapsed = time.time() - t0
+
+    for c, r, e in results:
+        q = c["q"]
+        if e is not None:
             failures.append(f"[ERROR] {q[:30]} :: {e}")
             continue
 
@@ -169,7 +244,13 @@ def run(client: LightRAGClient, dataset_path: pathlib.Path = DATASET) -> dict:
     scores = {
         k: (round(100 * sum(v) / len(v)) if v else None, len(v)) for k, v in agg.items()
     }
-    return {"n_cases": len(cases), "scores": scores, "failures": failures}
+    return {
+        "n_cases": len(cases),
+        "scores": scores,
+        "failures": failures,
+        "elapsed_s": elapsed,
+        "per_case_s": elapsed / len(cases) if cases else 0.0,
+    }
 
 
 def sum_str(pct: int, n: int) -> str:
@@ -187,12 +268,54 @@ def main() -> int:
     )
     ap.add_argument("--top-k", type=int, default=TOP_K, help="chunk_top_k for retrieval")
     ap.add_argument("--dataset", default=str(DATASET), help="path to eval jsonl")
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=int(os.getenv("EVAL_WORKERS", "1")),
+        # NOTE: this stack is single-GPU compute-bound (prompt prefill), so concurrency
+        # makes it SLOWER (GPU thrash). 1 is fastest here; raise only if the LLM backend
+        # genuinely has spare parallel capacity.
+        help="concurrent queries (default 1; >1 is slower on a single GPU)",
+    )
+    ap.add_argument(
+        "--response-type",
+        default=None,
+        help="LightRAG response_type, e.g. 'Single Paragraph' (shorter = faster generation)",
+    )
+    # Proven defaults (2026-06-14): cap the context to ~12k tokens. This cuts the dominant
+    # prompt-prefill cost (~2.7x faster) while still keeping all 5 reranked chunks in the
+    # references, so retrieval@5 stays a fair measurement. Mirrors the server-side .env.
+    ap.add_argument(
+        "--max-total-tokens",
+        type=int,
+        default=12000,
+        help="cap total context tokens (shrinks prompt prefill, the dominant cost)",
+    )
+    ap.add_argument("--max-entity-tokens", type=int, default=1500)
+    ap.add_argument("--max-relation-tokens", type=int, default=1500)
+    ap.add_argument(
+        "--query-top-k",
+        type=int,
+        default=None,
+        help="entities/relations retrieved (QueryParam.top_k); lower = smaller context",
+    )
     args = ap.parse_args()
 
-    client = LightRAGClient(args.base, args.mode, args.top_k)
-    res = run(client, pathlib.Path(args.dataset))
+    client = LightRAGClient(
+        args.base,
+        args.mode,
+        args.top_k,
+        response_type=args.response_type,
+        max_total_tokens=args.max_total_tokens,
+        max_entity_tokens=args.max_entity_tokens,
+        max_relation_tokens=args.max_relation_tokens,
+        query_top_k=args.query_top_k,
+    )
+    res = run(client, pathlib.Path(args.dataset), workers=args.workers)
     print(
-        f"\nEVAL — {res['n_cases']} cases  (mode={args.mode}, top_k={args.top_k})\n"
+        f"\nEVAL — {res['n_cases']} cases  "
+        f"(mode={args.mode}, top_k={args.top_k}, workers={args.workers})\n"
+        + f"wall={res['elapsed_s']:.0f}s  avg={res['per_case_s']:.1f}s/case\n"
         + "-" * 48
     )
     for dim, (pct, n) in res["scores"].items():
