@@ -552,7 +552,7 @@ class LLMConfigCache:
         self.bedrock_llm_options = None
 
         # Only initialize and log OpenAI options when using OpenAI-related bindings
-        if args.llm_binding in ["openai", "azure_openai"]:
+        if args.llm_binding in ["openai", "azure_openai", "llama-swap"]:
             from lightrag.llm.binding_options import OpenAILLMOptions
 
             self.openai_llm_options = OpenAILLMOptions.options_dict(args)
@@ -667,7 +667,7 @@ def create_optimized_embedding_function(
     provider_supports_asymmetric = False
 
     try:
-        if binding == "openai":
+        if binding in ["openai", "llama-swap"]:
             from lightrag.llm.openai import openai_embed
 
             provider_func = openai_embed
@@ -1225,6 +1225,7 @@ def create_app(args):
         "azure_openai",
         "bedrock",
         "gemini",
+        "llama-swap",
     ]:
         raise Exception("llm binding not supported")
 
@@ -1237,6 +1238,7 @@ def create_app(args):
         "jina",
         "gemini",
         "voyageai",
+        "llama-swap",
     ]:
         raise Exception(f"embedding binding '{args.embedding_binding}' not supported")
 
@@ -1625,7 +1627,7 @@ def create_app(args):
 
         role_provider_options = override_meta.get("provider_options")
         if role_provider_options is None:
-            if role_binding in ["openai", "azure_openai"]:
+            if role_binding in ["openai", "azure_openai", "llama-swap"]:
                 from lightrag.llm.binding_options import OpenAILLMOptions
 
                 role_provider_options = OpenAILLMOptions.options_dict_for_role(

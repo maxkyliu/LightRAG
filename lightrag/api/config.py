@@ -58,7 +58,7 @@ ollama_server_infos = OllamaServerInfos()
 DEFAULT_TOKEN_SECRET = "lightrag-jwt-default-secret-key!"
 NO_PREFIX_SENTINEL = "NO_PREFIX"
 PROVIDER_ASYMMETRIC_EMBEDDING_BINDINGS = {"gemini", "jina", "voyageai"}
-PREFIX_ASYMMETRIC_EMBEDDING_BINDINGS = {"azure_openai", "ollama", "openai"}
+PREFIX_ASYMMETRIC_EMBEDDING_BINDINGS = {"azure_openai", "ollama", "openai", "llama-swap"}
 
 
 class DefaultRAGStorageConfig:
@@ -74,6 +74,7 @@ def get_default_host(binding_type: str) -> str:
         "lollms": os.getenv("LLM_BINDING_HOST", "http://localhost:9600"),
         "azure_openai": os.getenv("AZURE_OPENAI_ENDPOINT", "https://api.openai.com/v1"),
         "openai": os.getenv("LLM_BINDING_HOST", "https://api.openai.com/v1"),
+        "llama-swap": os.getenv("LLM_BINDING_HOST", "http://localhost:8080/v1"),
         # Let boto3 select the regional Bedrock endpoint unless the user
         # explicitly overrides LLM_BINDING_HOST / EMBEDDING_BINDING_HOST.
         "bedrock": os.getenv("LLM_BINDING_HOST", "DEFAULT_BEDROCK_ENDPOINT"),
@@ -406,6 +407,7 @@ def parse_args() -> argparse.Namespace:
             "azure_openai",
             "bedrock",
             "gemini",
+            "llama-swap",
         ],
         help="LLM binding type (default: from env or ollama)",
     )
@@ -422,6 +424,7 @@ def parse_args() -> argparse.Namespace:
             "jina",
             "gemini",
             "voyageai",
+            "llama-swap",
         ],
         help="Embedding binding type (default: from env or ollama)",
     )
@@ -454,7 +457,7 @@ def parse_args() -> argparse.Namespace:
     # Add LLM binding options based on determined value
     if llm_binding_value == "ollama":
         OllamaLLMOptions.add_args(parser)
-    elif llm_binding_value in ["openai", "azure_openai"]:
+    elif llm_binding_value in ["openai", "azure_openai", "llama-swap"]:
         OpenAILLMOptions.add_args(parser)
     elif llm_binding_value == "gemini":
         GeminiLLMOptions.add_args(parser)
