@@ -6,7 +6,7 @@ import json
 from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from lightrag.base import QueryParam
-from lightrag.api.utils_api import get_combined_auth_dependency
+from lightrag.api.utils_api import get_combined_auth_dependency, get_rag_for_request
 from lightrag.utils import logger
 from pydantic import BaseModel, Field, field_validator
 
@@ -326,7 +326,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             },
         },
     )
-    async def query_text(request: QueryRequest):
+    async def query_text(
+        request: QueryRequest, rag=Depends(get_rag_for_request)
+    ):
         """
         Comprehensive RAG query endpoint with non-streaming response. Parameter "stream" is ignored.
 
@@ -596,7 +598,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             },
         },
     )
-    async def query_text_stream(request: QueryRequest):
+    async def query_text_stream(
+        request: QueryRequest, rag=Depends(get_rag_for_request)
+    ):
         """
         Advanced RAG query endpoint with flexible streaming response.
 
@@ -1048,7 +1052,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             },
         },
     )
-    async def query_data(request: QueryRequest):
+    async def query_data(
+        request: QueryRequest, rag=Depends(get_rag_for_request)
+    ):
         """
         Advanced data retrieval endpoint for structured RAG analysis.
 
