@@ -1,0 +1,3 @@
+# Telegram gateway runtime dependencies (install into its own environment).
+python-telegram-bot>=21
+httpx>=0.27
