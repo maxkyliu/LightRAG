@@ -54,6 +54,26 @@ The STT, vision, and summarizer providers are optional. Without a summarizer,
 conversation talk-events are skipped (default-deny). Without STT/vision, voice
 and image inputs report the capability as unavailable instead of failing.
 
+### Local Whisper Turbo STT
+
+To transcribe voice notes in-process with a local GPU (no remote API), set
+`STT_PROVIDER=local` and install the extra deps:
+
+```bash
+pip install -r telegram_gateway/requirements-local-stt.txt   # torch + transformers
+# ffmpeg must also be installed (decodes Telegram OGG/Opus voice notes)
+```
+
+```bash
+STT_PROVIDER=local
+STT_MODEL=turbo        # openai/whisper-large-v3-turbo (size alias or full HF repo id)
+STT_LANGUAGE=          # empty = auto-detect; or en / zh / yue / …
+STT_DEVICE=            # empty = auto (cuda if available, else cpu)
+```
+
+The model is loaded lazily on the first voice message and cached for the process
+lifetime. This mirrors the Whisper engine used by the voicebox project.
+
 ## Security notes
 
 - The gateway is the trust boundary. Do not expose the LightRAG port publicly;

@@ -22,17 +22,40 @@ class MediaError(RuntimeError):
 class MediaService:
     def __init__(self, config: GatewayConfig):
         self._config = config
+        self._local_stt = None
+        if config.stt_provider == "local":
+            # Lazy-import so torch/transformers are only required when enabled.
+            from .stt_local import LocalWhisperEngine
+
+            self._local_stt = LocalWhisperEngine(
+                model=config.stt_model if config.stt_model != "whisper-1" else "turbo",
+                device=config.stt_device,
+                language=config.stt_language,
+            )
 
     # -------------------------------- STT ---------------------------------- #
 
     @property
     def stt_configured(self) -> bool:
+        if self._config.stt_provider == "local":
+            return True
         return bool(self._config.stt_endpoint)
 
     async def transcribe(self, audio: bytes, filename: str = "audio.ogg") -> str:
-        """Transcribe voice audio to text via an OpenAI-compatible STT endpoint."""
+        """Transcribe voice audio to text (local Whisper or remote API)."""
         if not self.stt_configured:
             raise MediaError("Voice transcription is not configured on this gateway.")
+        if self._local_stt is not None:
+            try:
+                return await self._local_stt.transcribe(audio)
+            except ModuleNotFoundError as e:
+                raise MediaError(
+                    "Local STT requires torch + transformers (see "
+                    "telegram_gateway/requirements-local-stt.txt). "
+                    f"Missing: {e.name}"
+                ) from e
+            except Exception as e:  # decode/inference failure
+                raise MediaError(f"Local transcription failed: {e}") from e
         url = f"{self._config.stt_endpoint.rstrip('/')}/audio/transcriptions"
         headers = {}
         if self._config.stt_api_key:

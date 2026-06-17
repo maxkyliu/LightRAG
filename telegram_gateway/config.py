@@ -49,10 +49,18 @@ class GatewayConfig:
     fetch_timeout_seconds: int = 60
     fetch_max_redirects: int = 3
 
-    # --- Media providers (OpenAI-compatible HTTP endpoints; optional) ---
+    # --- Speech-to-text (optional) ---
+    # Provider: "openai" (remote /audio/transcriptions) or "local" (in-process
+    # Whisper via transformers, e.g. Whisper Turbo on a local GPU).
+    stt_provider: str = "openai"
     stt_endpoint: str = ""
     stt_api_key: str = ""
     stt_model: str = "whisper-1"
+    # Local-engine knobs (used when stt_provider == "local").
+    stt_language: str = ""  # e.g. "en", "zh", "yue"; empty = auto-detect
+    stt_device: str = ""  # e.g. "cuda:0" / "cpu"; empty = auto
+
+    # --- Vision provider (OpenAI-compatible HTTP endpoint; optional) ---
     vision_endpoint: str = ""
     vision_api_key: str = ""
     vision_model: str = ""
@@ -81,9 +89,12 @@ class GatewayConfig:
             fetch_max_bytes=_get_int("FETCH_MAX_BYTES", 50 * 1024 * 1024),
             fetch_timeout_seconds=_get_int("FETCH_TIMEOUT_SECONDS", 60),
             fetch_max_redirects=_get_int("FETCH_MAX_REDIRECTS", 3),
+            stt_provider=_get("STT_PROVIDER", "openai").lower(),
             stt_endpoint=_get("STT_ENDPOINT"),
             stt_api_key=_get("STT_API_KEY"),
             stt_model=_get("STT_MODEL", "whisper-1"),
+            stt_language=_get("STT_LANGUAGE"),
+            stt_device=_get("STT_DEVICE"),
             vision_endpoint=_get("VISION_ENDPOINT"),
             vision_api_key=_get("VISION_API_KEY"),
             vision_model=_get("VISION_MODEL"),
