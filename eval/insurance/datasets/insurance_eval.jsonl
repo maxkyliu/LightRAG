@@ -1,0 +1,48 @@
+{"q": "「我們」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_2in1_product_summary.pdf", "expected_page": 15, "expected_keyword": "友邦保險（國際）有限", "term_zh": "我們", "term_en": ""}
+{"q": "「投資選擇」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_2in1_product_summary.pdf", "expected_page": 92, "expected_keyword": "可供您於友邦提供之本", "term_zh": "投資選擇", "term_en": ""}
+{"q": "「評估日」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_2in1_product_summary.pdf", "expected_page": 103, "expected_keyword": "評定連繫基金的資產淨", "term_zh": "評估日", "term_en": ""}
+{"q": "「延續供款戶口價值」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_treasure_advantage2_brochure.pdf", "expected_page": 45, "expected_keyword": "名義上分配至延續供款", "term_zh": "延續供款戶口價值", "term_en": "Accumulation Unit Account Value"}
+{"q": "「最近期可得的買入價」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_treasure_advantage2_brochure.pdf", "expected_page": 45, "expected_keyword": "就一項投資選擇於特定", "term_zh": "最近期可得的買入價", "term_en": "Latest Available Bid Price"}
+{"q": "「下一個適當之評估日」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_treasure_advantage2_brochure.pdf", "expected_page": 46, "expected_keyword": "基於連繫基金的買賣及", "term_zh": "下一個適當之評估日", "term_en": "Next Appropriate Valuation Day"}
+{"q": "「意外」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 23, "expected_keyword": "因暴力、外在及可見因", "term_zh": "意外", "term_en": ""}
+{"q": "「每年保障限額」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 23, "expected_keyword": "本公司在每個保單年度", "term_zh": "每年保障限額", "term_en": ""}
+{"q": "「投保申請文件」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 23, "expected_keyword": "向本公司就本認可産品", "term_zh": "投保申請文件", "term_en": ""}
+{"q": "「個別不保項目」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 23, "expected_keyword": "本公司可按受保人的投", "term_zh": "個別不保項目", "term_en": ""}
+{"q": "「住院」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 23, "expected_keyword": "受保人在醫療所需的情", "term_zh": "住院", "term_en": ""}
+{"q": "「先天性疾病」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "(a)任何於出生時或", "term_zh": "先天性疾病", "term_en": ""}
+{"q": "「日間手術」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "受保人作為日症病人在", "term_zh": "日間手術", "term_en": ""}
+{"q": "「日症病人」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "在診所、日間手術中心", "term_zh": "日症病人", "term_en": ""}
+{"q": "「自付費」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "在本公司賠償餘下的合", "term_zh": "自付費", "term_en": ""}
+{"q": "「交付」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "於第二部分第2(a)", "term_zh": "交付", "term_en": ""}
+{"q": "「急症」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "受保人需立即接受醫療", "term_zh": "急症", "term_en": ""}
+{"q": "「急症治療」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "急症所需的醫療服務，", "term_zh": "急症治療", "term_en": ""}
+{"q": "「靈活計劃」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "在自願醫保的框架下，", "term_zh": "靈活計劃", "term_en": ""}
+{"q": "「監護人」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 24, "expected_keyword": "按香港法例第13章《", "term_zh": "監護人", "term_en": ""}
+{"q": "「醫院」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "按其所在地法律妥為成", "term_zh": "醫院", "term_en": ""}
+{"q": "「保險業監管局」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "按《保險業條例》第4", "term_zh": "保險業監管局", "term_en": ""}
+{"q": "「受保人」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "本條款及保障所保障，", "term_zh": "受保人", "term_en": ""}
+{"q": "「深切治療部」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "醫院內專為住院病人提", "term_zh": "深切治療部", "term_en": ""}
+{"q": "「終身保障限額」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "本公司由本條款及保障", "term_zh": "終身保障限額", "term_en": ""}
+{"q": "「醫療所需」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 25, "expected_keyword": "按照一般公認的醫療標", "term_zh": "醫療所需", "term_en": ""}
+{"q": "「保單」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 26, "expected_keyword": "由本公司承保及簽發的", "term_zh": "保單", "term_en": ""}
+{"q": "「保單持有人」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 26, "expected_keyword": "本條款及保障的起始日", "term_zh": "保單持有人", "term_en": ""}
+{"q": "「保單資料頁」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 26, "expected_keyword": "本條款及保障的附表，", "term_zh": "保單資料頁", "term_en": ""}
+{"q": "「同一類別保單」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 26, "expected_keyword": "所有具備相同條款及細", "term_zh": "同一類別保單", "term_en": ""}
+{"q": "「投保前已有病症」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 27, "expected_keyword": "受保人於保單簽發日或", "term_zh": "投保前已有病症", "term_en": ""}
+{"q": "「附加保費」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 27, "expected_keyword": "本公司因承受受保人的", "term_zh": "附加保費", "term_en": ""}
+{"q": "「訂明診斷成像檢測」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 27, "expected_keyword": "電腦斷層掃描（“CT", "term_zh": "訂明診斷成像檢測", "term_en": ""}
+{"q": "「訂明非手術癌症治療」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 27, "expected_keyword": "治療癌症的放射性治療", "term_zh": "訂明非手術癌症治療", "term_en": ""}
+{"q": "「合理及慣常」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 27, "expected_keyword": "就醫療服務的收費而言", "term_zh": "合理及慣常", "term_en": ""}
+{"q": "「手術表」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 28, "expected_keyword": "附於本保障表的手術列", "term_zh": "手術表", "term_en": ""}
+{"q": "「疾病」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 28, "expected_keyword": "正常健康狀態因受到病", "term_zh": "疾病", "term_en": ""}
+{"q": "「標準計劃」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 28, "expected_keyword": "條款及細則與保障表等", "term_zh": "標準計劃", "term_en": ""}
+{"q": "「標準保費」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 28, "expected_keyword": "本公司向保單持有人就", "term_zh": "標準保費", "term_en": ""}
+{"q": "「積極治療」是甚麼意思？", "dimension": "definition", "should_refuse": false, "expected_source": "aia_vhis_newmedical_F00074.pdf", "expected_page": 38, "expected_keyword": "就其他保障批註丙部分", "term_zh": "積極治療", "term_en": ""}
+{"q": "香港明天會否掛八號風球？", "dimension": "refusal", "should_refuse": true}
+{"q": "今日恒生指數收市點數是多少？", "dimension": "refusal", "should_refuse": true}
+{"q": "可以幫我訂一張去東京的機票嗎？", "dimension": "refusal", "should_refuse": true}
+{"q": "你們公司的CEO是誰？", "dimension": "refusal", "should_refuse": true}
+{"q": "蘋果公司的最新手機型號是甚麼？", "dimension": "refusal", "should_refuse": true}
+{"q": "What does grace period mean?", "dimension": "mixed_lang", "should_refuse": false, "expected_keyword": "寬限"}
+{"q": "What is the definition of beneficiary?", "dimension": "mixed_lang", "should_refuse": false, "expected_keyword": "受益人"}
+{"q": "Explain the policy owner.", "dimension": "mixed_lang", "should_refuse": false, "expected_keyword": "持有人"}

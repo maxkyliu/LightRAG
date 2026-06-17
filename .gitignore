@@ -91,3 +91,6 @@ memory-bank
 
 # native_parser/docx CLI output (audit JSONL + image dir)
 /parse_output/
+
+# insurance eval corpus PDFs (public docs; provenance in corpus/SOURCES.md, re-download to use build_dataset.py)
+eval/insurance/corpus/*.pdf

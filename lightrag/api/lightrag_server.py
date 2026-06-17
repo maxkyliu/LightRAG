@@ -59,6 +59,7 @@ from lightrag.parser.routing import (
 from lightrag.parser.external.mineru.cache import MinerUParserOptions
 from lightrag.api.routers.query_routes import create_query_routes
 from lightrag.api.routers.graph_routes import create_graph_routes
+from lightrag.api.workspace_registry import WorkspaceRAGRegistry
 from lightrag.api.routers.ollama_api import OllamaAPI
 
 from lightrag.utils import logger, set_verbose_debug
@@ -552,7 +553,7 @@ class LLMConfigCache:
         self.bedrock_llm_options = None
 
         # Only initialize and log OpenAI options when using OpenAI-related bindings
-        if args.llm_binding in ["openai", "azure_openai"]:
+        if args.llm_binding in ["openai", "azure_openai", "llama-swap"]:
             from lightrag.llm.binding_options import OpenAILLMOptions
 
             self.openai_llm_options = OpenAILLMOptions.options_dict(args)
@@ -667,7 +668,7 @@ def create_optimized_embedding_function(
     provider_supports_asymmetric = False
 
     try:
-        if binding == "openai":
+        if binding in ["openai", "llama-swap"]:
             from lightrag.llm.openai import openai_embed
 
             provider_func = openai_embed
@@ -1225,6 +1226,7 @@ def create_app(args):
         "azure_openai",
         "bedrock",
         "gemini",
+        "llama-swap",
     ]:
         raise Exception("llm binding not supported")
 
@@ -1237,6 +1239,7 @@ def create_app(args):
         "jina",
         "gemini",
         "voyageai",
+        "llama-swap",
     ]:
         raise Exception(f"embedding binding '{args.embedding_binding}' not supported")
 
@@ -1285,6 +1288,11 @@ def create_app(args):
         finally:
             # Clean up database connections
             await rag.finalize_storages()
+
+            # Finalize any lazily-created per-workspace instances
+            registry = getattr(app.state, "workspace_registry", None)
+            if registry is not None:
+                await registry.finalize_dynamic()
 
             if "LIGHTRAG_GUNICORN_MODE" not in os.environ:
                 # Only perform cleanup in Uvicorn single-process mode
@@ -1625,7 +1633,7 @@ def create_app(args):
 
         role_provider_options = override_meta.get("provider_options")
         if role_provider_options is None:
-            if role_binding in ["openai", "azure_openai"]:
+            if role_binding in ["openai", "azure_openai", "llama-swap"]:
                 from lightrag.llm.binding_options import OpenAILLMOptions
 
                 role_provider_options = OpenAILLMOptions.options_dict_for_role(
@@ -2005,11 +2013,15 @@ def create_app(args):
         for spec in ROLES
     }
 
-    # Initialize RAG with unified configuration
-    try:
+    # Initialize RAG with unified configuration.
+    # Wrapped in a builder so the workspace registry can lazily create
+    # per-workspace LightRAG instances (header-based multi-tenancy), all
+    # sharing the same backend configuration.
+    # See lightrag/api/workspace_registry.py.
+    def _build_rag(workspace_value: str) -> LightRAG:
         rag = LightRAG(
             working_dir=args.working_dir,
-            workspace=args.workspace,
+            workspace=workspace_value,
             llm_model_func=create_llm_model_func(args.llm_binding),
             llm_model_name=args.llm_model,
             llm_model_max_async=args.max_async,
@@ -2066,18 +2078,35 @@ def create_app(args):
                 for spec in ROLES
             },
         )
+        _log_role_provider_options(rag)
+        rag.register_role_llm_builder(
+            lambda role, meta: (
+                create_role_llm_func(role, meta),
+                create_role_llm_model_kwargs(role, meta),
+            )
+        )
+        return rag
+
+    try:
+        rag = _build_rag(args.workspace)
     except Exception as e:
         logger.error(f"Failed to initialize LightRAG: {e}")
         raise
 
-    _log_role_provider_options(rag)
+    async def _init_workspace_rag(instance: LightRAG) -> None:
+        # Mirror the default-instance startup path (see lifespan): bring up
+        # storages and run data migration for a lazily-created workspace.
+        await instance.initialize_storages()
+        await instance.check_and_migrate_data()
 
-    rag.register_role_llm_builder(
-        lambda role, meta: (
-            create_role_llm_func(role, meta),
-            create_role_llm_model_kwargs(role, meta),
-        )
+    workspace_registry = WorkspaceRAGRegistry(
+        default_workspace=args.workspace,
+        default_rag=rag,
+        builder=_build_rag,
+        initializer=_init_workspace_rag,
     )
+    app.state.rag = rag
+    app.state.workspace_registry = workspace_registry
 
     # Add routes
     # root_path is set on the app for reverse proxy support;

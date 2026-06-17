@@ -3,6 +3,7 @@ Utility functions for the LightRAG API.
 """
 
 import os
+import re
 import argparse
 from typing import Optional, List, Tuple
 import sys
@@ -22,6 +23,47 @@ from .auth import auth_handler
 from .config import ollama_server_infos, global_args, get_env_value
 
 logger = logging.getLogger("lightrag")
+
+
+# ========== Per-request workspace routing (multi-tenancy) ==========
+# Workspace names are restricted to [a-zA-Z0-9_]; anything else is sanitized.
+_WORKSPACE_INVALID_CHARS = re.compile(r"[^a-zA-Z0-9_]")
+
+
+def extract_workspace_from_request(request: Request) -> Optional[str]:
+    """Extract and sanitize the workspace from the ``LIGHTRAG-WORKSPACE`` header.
+
+    Returns ``None`` when the header is absent or empty, so callers fall back to
+    the server's configured default workspace. Otherwise returns the sanitized
+    workspace name (invalid characters replaced with underscores).
+    """
+    raw = (request.headers.get("LIGHTRAG-WORKSPACE", "") or "").strip()
+    if not raw:
+        return None
+    sanitized = _WORKSPACE_INVALID_CHARS.sub("_", raw)
+    if sanitized != raw:
+        logger.warning(
+            f"Workspace header '{raw}' contains invalid characters. "
+            f"Sanitized to '{sanitized}'."
+        )
+    return sanitized
+
+
+async def get_rag_for_request(request: Request):
+    """FastAPI dependency: resolve the LightRAG instance for this request.
+
+    Uses the per-request ``LIGHTRAG-WORKSPACE`` header to select (and lazily
+    build) the workspace's LightRAG instance from ``app.state.workspace_registry``.
+    Falls back to ``app.state.rag`` (the default instance) when no registry is
+    configured, preserving single-workspace behavior.
+    """
+    app_state = request.app.state
+    registry = getattr(app_state, "workspace_registry", None)
+    if registry is None:
+        return getattr(app_state, "rag", None)
+    workspace = extract_workspace_from_request(request)
+    return await registry.get(workspace)
+
 
 # ========== Token Renewal Rate Limiting ==========
 # Cache to track last renewal time per user (username as key)

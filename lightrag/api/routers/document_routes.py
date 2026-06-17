@@ -52,7 +52,7 @@ from lightrag.utils import (
     generate_track_id,
     move_file_to_parsed_dir,
 )
-from lightrag.api.utils_api import get_combined_auth_dependency
+from lightrag.api.utils_api import get_combined_auth_dependency, get_rag_for_request
 from ..config import global_args
 
 
@@ -2392,7 +2392,9 @@ def create_document_routes(
     @router.post(
         "/scan", response_model=ScanResponse, dependencies=[Depends(combined_auth)]
     )
-    async def scan_for_new_documents(background_tasks: BackgroundTasks):
+    async def scan_for_new_documents(
+        background_tasks: BackgroundTasks, rag=Depends(get_rag_for_request)
+    ):
         """
         Trigger the scanning process for new documents.
 
@@ -2516,7 +2518,9 @@ def create_document_routes(
         "/upload", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
     )
     async def upload_to_input_dir(
-        background_tasks: BackgroundTasks, file: UploadFile = File(...)
+        background_tasks: BackgroundTasks,
+        file: UploadFile = File(...),
+        rag=Depends(get_rag_for_request),
     ):
         """
         Upload a file to the input directory and index it.
@@ -2765,7 +2769,9 @@ def create_document_routes(
         "/text", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
     )
     async def insert_text(
-        request: InsertTextRequest, background_tasks: BackgroundTasks
+        request: InsertTextRequest,
+        background_tasks: BackgroundTasks,
+        rag=Depends(get_rag_for_request),
     ):
         """
         Insert text into the RAG system.
@@ -2869,7 +2875,9 @@ def create_document_routes(
         dependencies=[Depends(combined_auth)],
     )
     async def insert_texts(
-        request: InsertTextsRequest, background_tasks: BackgroundTasks
+        request: InsertTextsRequest,
+        background_tasks: BackgroundTasks,
+        rag=Depends(get_rag_for_request),
     ):
         """
         Insert multiple texts into the RAG system.
@@ -2990,7 +2998,7 @@ def create_document_routes(
     @router.delete(
         "", response_model=ClearDocumentsResponse, dependencies=[Depends(combined_auth)]
     )
-    async def clear_documents():
+    async def clear_documents(rag=Depends(get_rag_for_request)):
         """
         Clear all documents from the RAG system.
 
@@ -3215,7 +3223,9 @@ def create_document_routes(
         dependencies=[Depends(combined_auth)],
         response_model=PipelineStatusResponse,
     )
-    async def get_pipeline_status() -> PipelineStatusResponse:
+    async def get_pipeline_status(
+        rag=Depends(get_rag_for_request),
+    ) -> PipelineStatusResponse:
         """
         Get the current status of the document indexing pipeline.
 
@@ -3314,7 +3324,9 @@ def create_document_routes(
     @router.get(
         "", response_model=DocsStatusesResponse, dependencies=[Depends(combined_auth)]
     )
-    async def documents() -> DocsStatusesResponse:
+    async def documents(
+        rag=Depends(get_rag_for_request),
+    ) -> DocsStatusesResponse:
         """
         Get the status of all documents in the system. This endpoint is deprecated; use /documents/paginated instead.
         To prevent excessive resource consumption, a maximum of 1,000 records is returned.
@@ -3432,6 +3444,7 @@ def create_document_routes(
     async def delete_document(
         delete_request: DeleteDocRequest,
         background_tasks: BackgroundTasks,
+        rag=Depends(get_rag_for_request),
     ) -> DeleteDocByIdResponse:
         """
         Delete documents and all their associated data by their IDs using background processing.
@@ -3522,7 +3535,9 @@ def create_document_routes(
         response_model=ClearCacheResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def clear_cache(request: ClearCacheRequest):
+    async def clear_cache(
+        request: ClearCacheRequest, rag=Depends(get_rag_for_request)
+    ):
         """
         Clear all cache data from the LLM response cache storage.
 
@@ -3556,7 +3571,9 @@ def create_document_routes(
         response_model=TrackStatusResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def get_track_status(track_id: str) -> TrackStatusResponse:
+    async def get_track_status(
+        track_id: str, rag=Depends(get_rag_for_request)
+    ) -> TrackStatusResponse:
         """
         Get the processing status of documents by tracking ID.
 
@@ -3632,6 +3649,7 @@ def create_document_routes(
     )
     async def get_documents_paginated(
         request: DocumentsRequest,
+        rag=Depends(get_rag_for_request),
     ) -> PaginatedDocsResponse:
         """
         Get documents with pagination support.
@@ -3811,7 +3829,9 @@ def create_document_routes(
         response_model=StatusCountsResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def get_document_status_counts() -> StatusCountsResponse:
+    async def get_document_status_counts(
+        rag=Depends(get_rag_for_request),
+    ) -> StatusCountsResponse:
         """
         Get counts of documents by status.
 
@@ -3838,7 +3858,9 @@ def create_document_routes(
         response_model=ReprocessResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def reprocess_failed_documents(background_tasks: BackgroundTasks):
+    async def reprocess_failed_documents(
+        background_tasks: BackgroundTasks, rag=Depends(get_rag_for_request)
+    ):
         """
         Reprocess failed and pending documents.
 
@@ -3884,7 +3906,7 @@ def create_document_routes(
         response_model=CancelPipelineResponse,
         dependencies=[Depends(combined_auth)],
     )
-    async def cancel_pipeline():
+    async def cancel_pipeline(rag=Depends(get_rag_for_request)):
         """
         Request cancellation of the currently running pipeline.
 
