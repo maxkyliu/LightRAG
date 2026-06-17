@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -114,6 +115,16 @@ async def _download(context: ContextTypes.DEFAULT_TYPE, file_id: str) -> bytes:
 
 def _has_attachment(message) -> bool:
     return bool(message.document or message.photo or message.voice or message.audio)
+
+
+def _ingest_filename(user_id: int, prefix: str, ext: str) -> str:
+    """Unique per-message file_source so text/voice ingests never collide.
+
+    LightRAG's dedup guard keys on the (base)file name, so a fixed name would
+    409 on the second ingest. Include the user id + a microsecond timestamp.
+    """
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    return f"{prefix}-{user_id}-{stamp}.{ext}"
 
 
 # --------------------------------------------------------------------------- #
@@ -227,8 +238,10 @@ async def _end_session(update: Update, context) -> None:
         return
     try:
         doc_id = await svc.talk_events.process_ended_session(session)
-    except LightRAGError as e:
-        logger.warning("talk-event ingest failed: %s", e)
+    except Exception as e:
+        # Summarizer/ingest failures (e.g. unreachable endpoint) must not crash
+        # /end — the session is already closed; just skip the summary.
+        logger.warning("talk-event processing failed: %s", e)
         await _reply(update, "Session ended (could not save summary).", markdown=False)
         return
     if doc_id:
@@ -336,9 +349,16 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             await _do_query(update, context, identity, payload_text)
     except LightRAGError as e:
         logger.warning("LightRAG error: %s", e)
-        await _reply(
-            update, "The knowledge base is unavailable right now.", markdown=False
-        )
+        if "already contains" in str(e) or "-> 409" in str(e):
+            await _reply(
+                update,
+                "That content is already in the knowledge base.",
+                markdown=False,
+            )
+        else:
+            await _reply(
+                update, "The knowledge base is unavailable right now.", markdown=False
+            )
     except MediaError as e:
         await _reply(update, str(e), markdown=False)
 
@@ -381,7 +401,11 @@ async def _do_ingest(
         if not transcript:
             await _reply(update, "Could not transcribe that audio.", markdown=False)
             return
-        await svc.client.insert_text(ws, transcript, "voice-note.txt")
+        await svc.client.insert_text(
+            ws,
+            transcript,
+            _ingest_filename(identity.membership.tg_user_id, "voice-note", "txt"),
+        )
         await _reply(update, "📥 Voice note transcribed and ingested.", markdown=False)
         return
 
@@ -406,7 +430,11 @@ async def _do_ingest(
 
     # 5) Plain text -> insert as a document.
     if payload_text:
-        await svc.client.insert_text(ws, payload_text, "telegram-note.txt")
+        await svc.client.insert_text(
+            ws,
+            payload_text,
+            _ingest_filename(identity.membership.tg_user_id, "telegram-note", "txt"),
+        )
         await _reply(update, "📥 Text ingested.", markdown=False)
         return
 
@@ -440,13 +468,17 @@ async def _do_query(
         )
         return
 
-    answer = await svc.client.query(ws, query_text)
-    await _reply(update, answer or "I couldn't find an answer to that.", markdown=False)
-
-    # Buffer the turn; flush as a talk-event if the token cap is exceeded.
+    # Buffer the user's turn before querying so the session reflects the
+    # conversation even if the backend query fails (e.g. times out) — the
+    # exception then propagates to on_message, which replies.
     svc.sessions.append_turn(
         identity.membership.tg_user_id, team_id, "user", query_text
     )
+
+    answer = await svc.client.query(ws, query_text)
+    await _reply(update, answer or "I couldn't find an answer to that.", markdown=False)
+
+    # Record the assistant turn; flush as a talk-event if the token cap is hit.
     _, exceeded = svc.sessions.append_turn(
         identity.membership.tg_user_id, team_id, "assistant", answer or ""
     )
@@ -455,11 +487,24 @@ async def _do_query(
         if session is not None:
             try:
                 await svc.talk_events.process_ended_session(session)
-            except LightRAGError as e:
-                logger.warning("token-cap talk-event ingest failed: %s", e)
+            except Exception as e:
+                logger.warning("token-cap talk-event processing failed: %s", e)
+
+
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Catch-all so no update ever crashes unhandled."""
+    logger.error("Unhandled error processing update: %s", context.error)
+    if isinstance(update, Update) and update.effective_message:
+        try:
+            await update.effective_message.reply_text(
+                "Something went wrong handling that — please try again."
+            )
+        except Exception:  # pragma: no cover - best-effort
+            pass
 
 
 def register_handlers(application: Application) -> None:
+    application.add_error_handler(on_error)
     application.add_handler(
         CallbackQueryHandler(on_forget_callback, pattern=r"^forget:")
     )

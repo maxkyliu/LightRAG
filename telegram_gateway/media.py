@@ -62,13 +62,16 @@ class MediaService:
             headers["Authorization"] = f"Bearer {self._config.stt_api_key}"
         files = {"file": (filename, audio, "application/octet-stream")}
         data = {"model": self._config.stt_model}
-        async with httpx.AsyncClient(
-            timeout=self._config.request_timeout_seconds
-        ) as client:
-            resp = await client.post(url, headers=headers, files=files, data=data)
-            if resp.status_code >= 400:
-                raise MediaError(f"STT failed: {resp.status_code} {resp.text[:200]}")
-            return (resp.json().get("text") or "").strip()
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._config.request_timeout_seconds
+            ) as client:
+                resp = await client.post(url, headers=headers, files=files, data=data)
+        except httpx.HTTPError as e:
+            raise MediaError(f"STT endpoint unreachable: {e}") from e
+        if resp.status_code >= 400:
+            raise MediaError(f"STT failed: {resp.status_code} {resp.text[:200]}")
+        return (resp.json().get("text") or "").strip()
 
     # ------------------------------- vision -------------------------------- #
 
@@ -105,13 +108,16 @@ class MediaService:
                 }
             ],
         }
-        async with httpx.AsyncClient(
-            timeout=self._config.request_timeout_seconds
-        ) as client:
-            resp = await client.post(url, headers=headers, json=payload)
-            if resp.status_code >= 400:
-                raise MediaError(f"Vision failed: {resp.status_code} {resp.text[:200]}")
-            data = resp.json()
-            return (
-                data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
-            ).strip()
+        try:
+            async with httpx.AsyncClient(
+                timeout=self._config.request_timeout_seconds
+            ) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+        except httpx.HTTPError as e:
+            raise MediaError(f"Vision endpoint unreachable: {e}") from e
+        if resp.status_code >= 400:
+            raise MediaError(f"Vision failed: {resp.status_code} {resp.text[:200]}")
+        data = resp.json()
+        return (
+            data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        ).strip()
