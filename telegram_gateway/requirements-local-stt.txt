@@ -1,0 +1,9 @@
+# Optional: in-process Whisper STT (STT_PROVIDER=local).
+# Install on top of requirements.txt. Also requires the `ffmpeg` binary on the
+# host to decode Telegram's OGG/Opus voice notes.
+#
+# On CUDA hosts, install the torch build matching your platform/CUDA first
+# (see https://pytorch.org/get-started/locally/), then:
+transformers>=4.44
+torch>=2.2
+accelerate>=0.30
