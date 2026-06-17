@@ -94,3 +94,7 @@ memory-bank
 
 # insurance eval corpus PDFs (public docs; provenance in corpus/SOURCES.md, re-download to use build_dataset.py)
 eval/insurance/corpus/*.pdf
+
+# Telegram gateway runtime DB
+telegram_gateway.db
+telegram_gateway*.db
