@@ -440,13 +440,17 @@ async def _do_query(
         )
         return
 
-    answer = await svc.client.query(ws, query_text)
-    await _reply(update, answer or "I couldn't find an answer to that.", markdown=False)
-
-    # Buffer the turn; flush as a talk-event if the token cap is exceeded.
+    # Buffer the user's turn before querying so the session reflects the
+    # conversation even if the backend query fails (e.g. times out) — the
+    # exception then propagates to on_message, which replies.
     svc.sessions.append_turn(
         identity.membership.tg_user_id, team_id, "user", query_text
     )
+
+    answer = await svc.client.query(ws, query_text)
+    await _reply(update, answer or "I couldn't find an answer to that.", markdown=False)
+
+    # Record the assistant turn; flush as a talk-event if the token cap is hit.
     _, exceeded = svc.sessions.append_turn(
         identity.membership.tg_user_id, team_id, "assistant", answer or ""
     )
