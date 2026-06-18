@@ -4,6 +4,6 @@
 #
 # On CUDA hosts, install the torch build matching your platform/CUDA first
 # (see https://pytorch.org/get-started/locally/), then:
-transformers>=4.44
+transformers>=5.0  # dtype= pipeline kwarg (replaced torch_dtype in v5)
 torch>=2.2
 accelerate>=0.30

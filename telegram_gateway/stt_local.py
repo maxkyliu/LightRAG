@@ -70,13 +70,13 @@ class LocalWhisperEngine:
             device = "cuda:0"
         else:
             device = "cpu"
-        torch_dtype = torch.float16 if "cuda" in str(device) else torch.float32
+        dtype = torch.float16 if "cuda" in str(device) else torch.float32
 
         logger.info("Loading local Whisper '%s' on %s...", self._repo, device)
         pipe = pipeline(
             "automatic-speech-recognition",
             model=self._repo,
-            torch_dtype=torch_dtype,
+            dtype=dtype,  # transformers 5.x kwarg (replaces deprecated torch_dtype)
             device=device,
             chunk_length_s=self._chunk_length_s,  # long-form support via chunking
         )
