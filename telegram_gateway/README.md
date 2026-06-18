@@ -1,9 +1,9 @@
-# LightRAG Telegram Gateway
+# SmartRAG Telegram Gateway
 
-A standalone service that puts a multi-tenant Telegram front-end on a (patched)
-LightRAG server. Teams share a knowledge base; members onboard over chat, ask
-questions, ingest files/URLs/voice/images, and conversations are distilled back
-into the KB.
+A standalone service that puts a multi-tenant Telegram front-end ("SmartRAG") on
+a (patched) LightRAG server. Teams share a knowledge base; members onboard over
+chat, ask questions, ingest files/URLs/voice/images, and conversations are
+distilled back into the KB.
 
 This is the implementation of the `add-telegram-gateway` OpenSpec change. It
 depends on the **per-request workspace routing** patch in this fork

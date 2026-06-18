@@ -38,7 +38,7 @@ from .talk_events import TalkEventService
 logger = logging.getLogger("telegram_gateway")
 
 HELP_TEXT = (
-    "*LightRAG team assistant*\n\n"
+    "*SmartRAG team assistant*\n\n"
     "I answer questions from your team's shared knowledge base.\n\n"
     "*Getting started*\n"
     "• `/createteam <name>` — create a team (you become owner)\n"
