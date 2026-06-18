@@ -49,20 +49,75 @@ def extract_workspace_from_request(request: Request) -> Optional[str]:
     return sanitized
 
 
+# Roles that may appear in a token. A "viewer" (e.g. a Telegram team owner via a
+# magic link) is locked to a single workspace and may only read; everything else
+# (admin / user / api-key / no-auth) keeps the header-driven behavior.
+ROLE_VIEWER = "viewer"
+
+
+def get_request_principal(request: Request) -> Optional[dict]:
+    """Return the validated token payload for this request, if any.
+
+    Prefers the payload stashed by the auth dependency; if absent (e.g. the
+    write-guard resolves before the auth dependency), it lazily validates the
+    bearer token itself so enforcement is independent of dependency ordering.
+    """
+    info = getattr(request.state, "token_info", None)
+    if info is not None:
+        return info
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+        try:
+            info = auth_handler.validate_token(token)
+        except Exception:
+            return None
+        request.state.token_info = info
+        return info
+    return None
+
+
+def _principal_role_and_workspace(request: Request) -> Tuple[Optional[str], Optional[str]]:
+    info = get_request_principal(request)
+    if not info:
+        return None, None
+    workspace = (info.get("metadata") or {}).get("workspace")
+    return info.get("role"), workspace
+
+
 async def get_rag_for_request(request: Request):
     """FastAPI dependency: resolve the LightRAG instance for this request.
 
-    Uses the per-request ``LIGHTRAG-WORKSPACE`` header to select (and lazily
-    build) the workspace's LightRAG instance from ``app.state.workspace_registry``.
-    Falls back to ``app.state.rag`` (the default instance) when no registry is
-    configured, preserving single-workspace behavior.
+    Workspace selection is bound to the authenticated principal:
+
+    - a **viewer** token is forced to the workspace encoded in the token
+      (``metadata.workspace``); any ``LIGHTRAG-WORKSPACE`` header is ignored, so
+      a viewer cannot read another tenant's data by spoofing the header;
+    - every other principal (admin / api-key / no token) selects the workspace
+      from the ``LIGHTRAG-WORKSPACE`` header, falling back to the default.
     """
     app_state = request.app.state
     registry = getattr(app_state, "workspace_registry", None)
+
+    role, locked_workspace = _principal_role_and_workspace(request)
+    if role == ROLE_VIEWER and locked_workspace:
+        workspace = locked_workspace
+    else:
+        workspace = extract_workspace_from_request(request)
+
     if registry is None:
         return getattr(app_state, "rag", None)
-    workspace = extract_workspace_from_request(request)
     return await registry.get(workspace)
+
+
+async def require_write_access(request: Request) -> None:
+    """FastAPI dependency: reject mutating operations for read-only (viewer) tokens."""
+    role, _ = _principal_role_and_workspace(request)
+    if role == ROLE_VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This session is read-only.",
+        )
 
 
 # ========== Token Renewal Rate Limiting ==========
@@ -179,6 +234,9 @@ def get_combined_auth_dependency(api_key: Optional[str] = None):
         if token:
             try:
                 token_info = auth_handler.validate_token(token)
+                # Expose the validated payload to downstream dependencies
+                # (workspace routing + write-guard read role/metadata.workspace).
+                request.state.token_info = token_info
 
                 # ========== Token Auto-Renewal Logic ==========
                 from lightrag.api.config import global_args

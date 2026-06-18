@@ -1,14 +1,14 @@
 ## 1. Server: token roles + scoped-token minting
 
-- [ ] 1.1 `auth.py`: include `role` and (for viewers) `workspace` in the JWT metadata; helper to read them back
-- [ ] 1.2 `lightrag_server.py`: mint `AUTH_ACCOUNTS` logins as `role=admin`
-- [ ] 1.3 Add an authenticated admin-only endpoint to mint a short-lived viewer token for a given workspace (gateway calls this; JWT secret stays in LightRAG)
+- [x] 1.1 `auth.py`/`utils_api.py`: token carries `role` + (viewer) `metadata.workspace`; `get_request_principal` reads it back (lazily validates the bearer token, order-independent)
+- [x] 1.2 `lightrag_server.py`: `AUTH_ACCOUNTS` logins minted as `role=admin`
+- [x] 1.3 `POST /auth/mint-viewer-token` (admin-guarded via combined_auth + write-guard) → short-lived viewer token scoped to a workspace; JWT secret stays in LightRAG
 
 ## 2. Server: role × workspace enforcement
 
-- [ ] 2.1 `utils_api.get_rag_for_request`: for a viewer token, force the workspace to `token.workspace` (ignore the header); admin/no-token keep current behavior
-- [ ] 2.2 Add a write-guard dependency on ingest/upload/delete/clear that returns 403 for viewer tokens
-- [ ] 2.3 Isolation tests: viewer header-spoof denied; viewer mutation 403; admin any-workspace RW; no-token unchanged
+- [x] 2.1 `utils_api.get_rag_for_request`: viewer token forced to `token.workspace` (header ignored); admin/no-token keep header/default behavior
+- [x] 2.2 `require_write_access` dependency added to all mutating document routes (scan/upload/text/texts/clear/delete/clear_cache/reprocess/cancel) → 403 for viewers
+- [x] 2.3 Tests in `tests/api/test_workspace_routing.py`: viewer header-spoof locked, viewer mutation 403, admin any-workspace, no-token unchanged (20 pass; 26 path-prefix regression pass)
 
 ## 3. Audit log
 

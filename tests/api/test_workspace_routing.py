@@ -29,6 +29,7 @@ try:
     from lightrag.api.utils_api import (
         extract_workspace_from_request,
         get_rag_for_request,
+        require_write_access,
     )
     from lightrag.api.workspace_registry import WorkspaceRAGRegistry
 finally:
@@ -214,3 +215,67 @@ def test_no_registry_falls_back_to_default_rag():
     assert client.get("/whoami", headers={"LIGHTRAG-WORKSPACE": "ignored"}).json() == {
         "workspace": "only"
     }
+
+
+# --------------------------------------------------------------------------- #
+# Role × workspace enforcement (add-webui-team-owner-login)
+# --------------------------------------------------------------------------- #
+
+
+def _fake_request(registry, *, headers=None, token_info=None):
+    """Build a minimal object exposing the attrs get_rag_for_request reads."""
+    state = SimpleNamespace()
+    if token_info is not None:
+        state.token_info = token_info
+    app = SimpleNamespace(state=SimpleNamespace(workspace_registry=registry, rag=None))
+    return SimpleNamespace(app=app, state=state, headers=headers or {})
+
+
+async def test_viewer_token_locked_to_its_workspace():
+    registry, _default, _log = _make_registry(default_workspace="base")
+    req = _fake_request(
+        registry,
+        headers={"LIGHTRAG-WORKSPACE": "team_other"},  # spoof attempt
+        token_info={"role": "viewer", "metadata": {"workspace": "team_owner"}},
+    )
+    rag = await get_rag_for_request(req)
+    # Header is ignored; the viewer is forced to the token's workspace.
+    assert rag.workspace == "team_owner"
+
+
+async def test_admin_token_may_target_header_workspace():
+    registry, _default, _log = _make_registry(default_workspace="base")
+    req = _fake_request(
+        registry,
+        headers={"LIGHTRAG-WORKSPACE": "team_globex"},
+        token_info={"role": "admin", "metadata": {}},
+    )
+    rag = await get_rag_for_request(req)
+    assert rag.workspace == "team_globex"
+
+
+async def test_no_token_uses_header():
+    registry, _default, _log = _make_registry(default_workspace="base")
+    req = _fake_request(registry, headers={"LIGHTRAG-WORKSPACE": "team_x"})
+    rag = await get_rag_for_request(req)
+    assert rag.workspace == "team_x"
+
+
+async def test_write_guard_blocks_viewer():
+    from fastapi import HTTPException
+
+    req = _fake_request(
+        None, token_info={"role": "viewer", "metadata": {"workspace": "team_owner"}}
+    )
+    with pytest.raises(HTTPException) as exc:
+        await require_write_access(req)
+    assert exc.value.status_code == 403
+
+
+async def test_write_guard_allows_admin_and_anonymous():
+    # admin
+    await require_write_access(
+        _fake_request(None, token_info={"role": "admin", "metadata": {}})
+    )
+    # no token (api-key / default) — not a viewer, allowed
+    await require_write_access(_fake_request(None))

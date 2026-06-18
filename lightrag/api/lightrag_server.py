@@ -2,7 +2,7 @@
 LightRAG FastAPI Server
 """
 
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Body
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, Response
 from fastapi.openapi.docs import (
@@ -28,6 +28,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from lightrag.api.utils_api import (
     get_combined_auth_dependency,
+    require_write_access,
     display_splash_screen,
     check_env_file,
 )
@@ -2208,9 +2209,11 @@ def create_app(args):
         if not auth_handler.verify_password(username, form_data.password):
             raise HTTPException(status_code=401, detail="Incorrect credentials")
 
-        # Regular user login
+        # Password (AUTH_ACCOUNTS) logins are super admins: cross-workspace,
+        # full read/write (see webui-super-admin). Team owners receive a separate,
+        # read-only "viewer" token via the gateway magic link.
         user_token = auth_handler.create_token(
-            username=username, role="user", metadata={"auth_mode": "enabled"}
+            username=username, role="admin", metadata={"auth_mode": "enabled"}
         )
         return {
             "access_token": user_token,
@@ -2220,6 +2223,39 @@ def create_app(args):
             "api_version": api_version_display,
             "webui_title": webui_title,
             "webui_description": webui_description,
+        }
+
+    @app.post(
+        "/auth/mint-viewer-token",
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+    )
+    async def mint_viewer_token(
+        workspace: str = Body(..., embed=True),
+        ttl_minutes: int = Body(15, embed=True),
+    ):
+        """Mint a short-lived, read-only token scoped to one workspace.
+
+        Admin-only (the read-only write-guard rejects viewer callers; the gateway
+        authenticates with the server API key). The token carries role=viewer and
+        ``metadata.workspace``, so the bearer is locked to that workspace and
+        cannot mutate. Used by the Telegram gateway's ``/webui`` magic link.
+        """
+        ws = re.sub(r"[^a-zA-Z0-9_]", "_", (workspace or "").strip())
+        if not ws:
+            raise HTTPException(status_code=400, detail="workspace is required")
+        ttl = max(1, int(ttl_minutes))
+        token = auth_handler.create_token(
+            username=f"viewer:{ws}",
+            role="viewer",
+            custom_expire_hours=ttl / 60.0,
+            metadata={"workspace": ws, "auth_mode": "viewer"},
+        )
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "role": "viewer",
+            "workspace": ws,
+            "expires_in_minutes": ttl,
         }
 
     @app.get(
