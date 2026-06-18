@@ -65,6 +65,18 @@ class LightRAGClient:
         data = resp.json()
         return data.get("response", "")
 
+    # ------------------------------- auth ---------------------------------- #
+
+    async def mint_viewer_token(self, workspace: str, ttl_minutes: int = 15) -> str:
+        """Mint a short-lived, read-only WebUI token scoped to ``workspace``.
+
+        Admin-authenticated (the client's X-API-Key); the auth endpoint is not
+        workspace-scoped, so no LIGHTRAG-WORKSPACE header is sent.
+        """
+        payload = {"workspace": workspace, "ttl_minutes": ttl_minutes}
+        resp = await self._request("POST", "/auth/mint-viewer-token", "", json=payload)
+        return resp.json().get("access_token", "")
+
     # ------------------------------ ingest --------------------------------- #
 
     async def insert_text(self, workspace: str, text: str, file_source: str) -> str:

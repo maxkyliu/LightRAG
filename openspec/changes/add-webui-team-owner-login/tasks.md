@@ -12,14 +12,14 @@
 
 ## 3. Audit log
 
-- [ ] 3.1 Record `{actor, action, workspace, doc_ids?, ts}` on every admin ingest/delete/clear
-- [ ] 3.2 Choose + wire the audit sink (table vs append-only file)
+- [x] 3.1 Audit middleware records `{actor, role, action, workspace, status, ts}` for every mutating document route (admin writes + denied 403 viewer attempts). Per-doc-id granularity is a fast-follow (endpoint-level for v1).
+- [x] 3.2 Audit sink: always to the logger; also appends JSONL to `AUDIT_LOG_PATH` when set — `lightrag/api/audit.py`
 
 ## 4. Gateway: /webui magic link
 
-- [ ] 4.1 `bot.py`: `/webui` command — owner-only; call LightRAG to mint a viewer token for the owner's workspace
-- [ ] 4.2 Reply with a one-tap WebUI URL that establishes the session; short TTL
-- [ ] 4.3 Decline non-owners
+- [x] 4.1 `bot.py`: `/webui` — owner-only; calls `client.mint_viewer_token(workspace, ttl)` (admin-auth via X-API-Key)
+- [x] 4.2 Replies with `${webui_url}/webui#token=…`; short TTL (`GATEWAY_WEBUI_TOKEN_TTL_MINUTES`, default 15). (WebUI consuming the token = group 5.)
+- [x] 4.3 Declines non-owners and unaffiliated users
 
 ## 5. WebUI
 

@@ -36,6 +36,10 @@ class GatewayConfig:
     lightrag_api_key: str = ""
     workspace_prefix: str = "team_"
     request_timeout_seconds: int = 120
+    # Public base URL of the WebUI for the /webui magic link (defaults to the
+    # LightRAG base URL). Short-lived viewer-token TTL in minutes.
+    webui_url: str = ""
+    webui_token_ttl_minutes: int = 15
 
     # --- Gateway datastore ---
     db_path: str = "telegram_gateway.db"
@@ -83,6 +87,11 @@ class GatewayConfig:
             lightrag_api_key=_get("LIGHTRAG_API_KEY"),
             workspace_prefix=_get("GATEWAY_WORKSPACE_PREFIX", "team_"),
             request_timeout_seconds=_get_int("LIGHTRAG_REQUEST_TIMEOUT", 120),
+            webui_url=_get(
+                "GATEWAY_WEBUI_URL",
+                _get("LIGHTRAG_BASE_URL", "http://localhost:9621"),
+            ).rstrip("/"),
+            webui_token_ttl_minutes=_get_int("GATEWAY_WEBUI_TOKEN_TTL_MINUTES", 15),
             db_path=_get("GATEWAY_DB_PATH", "telegram_gateway.db"),
             session_idle_timeout_seconds=_get_int("SESSION_IDLE_TIMEOUT_SECONDS", 1800),
             session_token_cap=_get_int("SESSION_TOKEN_CAP", 6000),

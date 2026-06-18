@@ -32,6 +32,7 @@ from lightrag.api.utils_api import (
     display_splash_screen,
     check_env_file,
 )
+from lightrag.api.audit import audit_log, is_mutation
 from .config import (
     global_args,
     update_uvicorn_mode_config,
@@ -1338,6 +1339,31 @@ def create_app(args):
     }
 
     app = FastAPI(**app_kwargs)
+
+    # Audit trail for mutating operations (who/where/outcome). Runs after the
+    # request so request.state.token_info (set by the auth dependency) is
+    # available; logs admin writes and any denied (403) viewer attempts.
+    @app.middleware("http")
+    async def _audit_mutations(request: Request, call_next):
+        response = await call_next(request)
+        try:
+            if is_mutation(request.method, request.url.path):
+                info = getattr(request.state, "token_info", None) or {}
+                workspace = (
+                    (info.get("metadata") or {}).get("workspace")
+                    or request.headers.get("LIGHTRAG-WORKSPACE")
+                    or "(default)"
+                )
+                audit_log(
+                    actor=info.get("username", "anonymous"),
+                    role=info.get("role"),
+                    action=f"{request.method} {request.url.path}",
+                    workspace=workspace,
+                    status=response.status_code,
+                )
+        except Exception as e:  # pragma: no cover - audit must never break a request
+            logger.warning("audit middleware error: %s", e)
+        return response
 
     # Add custom validation error handler for /query/data endpoint
     @app.exception_handler(RequestValidationError)
