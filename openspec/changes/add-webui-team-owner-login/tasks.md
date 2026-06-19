@@ -31,17 +31,14 @@
 
 ## 6. Verify
 
-- [~] 6.1 E2E owner `/webui` read-only: mint endpoint verified live (returns role=viewer + metadata.workspace); enforcement (lock + 403) covered by 20 unit tests. Full live owner flow blocked in this deployment — see "Deployment requirement" below.
-- [~] 6.2 E2E admin RW + audit: **audit verified live** (denied 401 viewer attempt AND 200 anon write both logged). Admin login + switcher need `AUTH_ACCOUNTS` configured to test live.
-- [x] 6.3 Backward compatible: confirmed live — anonymous write under a header workspace → 200, default behavior unchanged.
+- [x] 6.1 E2E owner read-only — verified live on the secured stack: gateway mints a viewer token (X-API-Key); viewer **query 200**, viewer **write 403**; workspace bound to the token. Browser owner `/webui` click-through is the only non-automatable bit (APIs all verified).
+- [x] 6.2 E2E admin RW + audit — verified live: `admin` login (role=admin) writes to any workspace (200); the **audit log** records `viewer→403` and `admin→200` with actor/role/workspace. Browser admin switcher click-through is the manual bit.
+- [x] 6.3 Backward compatible: anonymous → 401 once auth is configured; default/no-token behavior unchanged in guest mode (both confirmed live).
 
-## Deployment requirement (found during e2e)
+## Deployment requirement (satisfied)
 
-The viewer/admin feature needs LightRAG **out of guest mode**, otherwise
-`combined_auth` rejects non-guest bearer tokens (viewer/admin) with 401 *before*
-enforcement runs. To make the magic-link + admin flow work end-to-end, set on
-LightRAG: `AUTH_ACCOUNTS=<admin:pass>`, `TOKEN_SECRET=<random>`, and a
-`LIGHTRAG_API_KEY` so the gateway can authenticate to `/auth/mint-viewer-token`;
-set the same `LIGHTRAG_API_KEY` in the gateway `.env`. (Guest mode confirmed:
-mint works, audit works, backward-compat holds; viewer tokens 401 at the auth
-layer.)
+The viewer/admin feature needs LightRAG **out of guest mode** (in guest mode
+`combined_auth` 401s non-guest bearer tokens before enforcement). Configured on
+this stack and verified: `AUTH_ACCOUNTS`, `TOKEN_SECRET`, and `LIGHTRAG_API_KEY`
+on LightRAG (the gateway uses the same `LIGHTRAG_API_KEY` to call
+`/auth/mint-viewer-token`). Secrets live only in the gitignored `.env` files.
