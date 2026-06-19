@@ -36,12 +36,15 @@ interface AuthState {
   webuiDescription: string | null; // Title description
   lastTokenRenewal: string | null; // Human-readable local time of last token renewal (for debugging and monitoring)
   tokenExpiresAt: number | null; // Token expiration timestamp (extracted from JWT)
+  role: string | null; // Token role: 'admin' | 'viewer' | 'guest' | ...
+  activeWorkspace: string | null; // Workspace sent as LIGHTRAG-WORKSPACE (viewer: locked; admin: switcher)
 
   login: (token: string, isGuest?: boolean, coreVersion?: string | null, apiVersion?: string | null, webuiTitle?: string | null, webuiDescription?: string | null) => void;
   logout: () => void;
   setVersion: (coreVersion: string | null, apiVersion: string | null) => void;
   setCustomTitle: (webuiTitle: string | null, webuiDescription: string | null) => void;
   setTokenRenewal: (renewalTime: number, expiresAt: number) => void; // Track token renewal
+  setActiveWorkspace: (workspace: string | null) => void; // Admin workspace switcher
 }
 
 const useBackendStateStoreBase = create<BackendState>()((set, get) => ({
@@ -174,7 +177,9 @@ const formatTimestampToLocalString = (timestamp: number): string => {
   return `${localTime} (UTC${offsetSign}${offsetHours})`;
 };
 
-const parseTokenPayload = (token: string): { sub?: string; role?: string; exp?: number } => {
+const parseTokenPayload = (
+  token: string
+): { sub?: string; role?: string; exp?: number; metadata?: { workspace?: string } } => {
   try {
     // JWT tokens are in the format: header.payload.signature
     const parts = token.split('.');
@@ -195,6 +200,16 @@ const getUsernameFromToken = (token: string): string | null => {
 const isGuestToken = (token: string): boolean => {
   const payload = parseTokenPayload(token);
   return payload.role === 'guest';
+};
+
+const getRoleFromToken = (token: string): string | null => {
+  const payload = parseTokenPayload(token);
+  return payload.role || null;
+};
+
+const getWorkspaceFromToken = (token: string): string | null => {
+  const payload = parseTokenPayload(token);
+  return (payload.metadata && payload.metadata.workspace) || null;
 };
 
 const getTokenExpiresAt = (token: string): number | null => {
@@ -242,6 +257,9 @@ const initAuthState = (): { isAuthenticated: boolean; isGuestMode: boolean; core
 export const useAuthStore = create<AuthState>(set => {
   // Get initial state from localStorage
   const initialState = initAuthState();
+  const initialToken = localStorage.getItem('LIGHTRAG-API-TOKEN');
+  const initialRole = initialToken ? getRoleFromToken(initialToken) : null;
+  const initialActiveWorkspace = localStorage.getItem('LIGHTRAG-WORKSPACE');
 
   return {
     isAuthenticated: initialState.isAuthenticated,
@@ -253,6 +271,8 @@ export const useAuthStore = create<AuthState>(set => {
     webuiDescription: initialState.webuiDescription,
     lastTokenRenewal: initialState.lastTokenRenewal,
     tokenExpiresAt: initialState.tokenExpiresAt,
+    role: initialRole,
+    activeWorkspace: initialActiveWorkspace,
 
     login: (token, isGuest = false, coreVersion = null, apiVersion = null, webuiTitle = null, webuiDescription = null) => {
       localStorage.setItem('LIGHTRAG-API-TOKEN', token);
@@ -278,8 +298,20 @@ export const useAuthStore = create<AuthState>(set => {
 
       const username = getUsernameFromToken(token);
       const tokenExpiresAt = getTokenExpiresAt(token);
+      const role = getRoleFromToken(token);
       const now = Date.now();
       const formattedTime = formatTimestampToLocalString(now);
+
+      // A viewer token (Telegram team owner via magic link) is locked to its
+      // workspace; persist it so the API client sends LIGHTRAG-WORKSPACE.
+      let activeWorkspace = localStorage.getItem('LIGHTRAG-WORKSPACE');
+      if (role === 'viewer') {
+        const ws = getWorkspaceFromToken(token);
+        if (ws) {
+          localStorage.setItem('LIGHTRAG-WORKSPACE', ws);
+          activeWorkspace = ws;
+        }
+      }
 
       // Initialize token issuance time with human-readable format
       localStorage.setItem('LIGHTRAG-LAST-TOKEN-RENEWAL', formattedTime);
@@ -294,12 +326,15 @@ export const useAuthStore = create<AuthState>(set => {
         webuiDescription: webuiDescription,
         tokenExpiresAt: tokenExpiresAt,
         lastTokenRenewal: formattedTime,
+        role: role,
+        activeWorkspace: activeWorkspace,
       });
     },
 
     logout: () => {
       localStorage.removeItem('LIGHTRAG-API-TOKEN');
       localStorage.removeItem('LIGHTRAG-LAST-TOKEN-RENEWAL');
+      localStorage.removeItem('LIGHTRAG-WORKSPACE');
 
       const coreVersion = localStorage.getItem('LIGHTRAG-CORE-VERSION');
       const apiVersion = localStorage.getItem('LIGHTRAG-API-VERSION');
@@ -316,7 +351,19 @@ export const useAuthStore = create<AuthState>(set => {
         webuiDescription: webuiDescription,
         lastTokenRenewal: null,
         tokenExpiresAt: null,
+        role: null,
+        activeWorkspace: null,
       });
+    },
+
+    setActiveWorkspace: (workspace) => {
+      // Admin workspace switcher: choose which tenant's workspace to act on.
+      if (workspace) {
+        localStorage.setItem('LIGHTRAG-WORKSPACE', workspace);
+      } else {
+        localStorage.removeItem('LIGHTRAG-WORKSPACE');
+      }
+      set({ activeWorkspace: workspace });
     },
 
     setVersion: (coreVersion, apiVersion) => {

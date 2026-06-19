@@ -433,6 +433,11 @@ axiosInstance.interceptors.request.use((config) => {
   if (apiKey) {
     config.headers['X-API-Key'] = apiKey
   }
+  // Route to the active workspace (viewer: locked to its token; admin: switcher).
+  const workspace = localStorage.getItem('LIGHTRAG-WORKSPACE')
+  if (workspace) {
+    config.headers['LIGHTRAG-WORKSPACE'] = workspace
+  }
   return config
 })
 
@@ -700,6 +705,10 @@ function _buildStreamHeaders(): HeadersInit {
   }
   if (apiKey) {
     headers['X-API-Key'] = apiKey;
+  }
+  const workspace = localStorage.getItem('LIGHTRAG-WORKSPACE');
+  if (workspace) {
+    headers['LIGHTRAG-WORKSPACE'] = workspace;
   }
   return headers;
 }

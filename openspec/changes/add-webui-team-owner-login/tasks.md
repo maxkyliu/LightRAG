@@ -23,11 +23,11 @@
 
 ## 5. WebUI
 
-- [ ] 5.1 Send `LIGHTRAG-WORKSPACE` from the session token (viewer: token workspace; admin: switcher)
-- [ ] 5.2 Accept the magic-link token and establish a session
-- [ ] 5.3 Hide/disable write controls for viewer sessions
-- [ ] 5.4 Admin-only workspace switcher
-- [ ] 5.5 `bun run build`; serve rebuilt assets (carried fork patch)
+- [x] 5.1 API client (axios interceptor + stream-fetch headers) sends `LIGHTRAG-WORKSPACE` from `localStorage` (viewer: token workspace; admin: switcher)
+- [x] 5.2 `main.tsx` consumes a `?token=` query param (HashRouter owns the hash), logs in via the auth store, strips it from the URL; store decodes role + workspace
+- [x] 5.3 `DocumentManager` hides upload/clear/delete for viewer sessions (server still enforces 403)
+- [x] 5.4 Admin-only workspace switcher in `SiteHeader` (sets active workspace + reloads)
+- [x] 5.5 `bun run build` clean; `tsc --noEmit` + eslint clean (caught/fixed a token-payload type). Assets rebuilt to `lightrag/api/webui` (gitignored; baked into the image on deploy)
 
 ## 6. Verify
 

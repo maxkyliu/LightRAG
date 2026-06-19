@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import { SiteInfo, webuiPrefix } from '@/lib/constants'
 import AppSettings from '@/components/AppSettings'
@@ -56,7 +57,15 @@ function TabsNavigation() {
 
 export default function SiteHeader() {
   const { t } = useTranslation()
-  const { isGuestMode, coreVersion, apiVersion, username, webuiTitle, webuiDescription } = useAuthStore()
+  const { isGuestMode, coreVersion, apiVersion, username, webuiTitle, webuiDescription, role, activeWorkspace, setActiveWorkspace } = useAuthStore()
+  const [wsInput, setWsInput] = useState(activeWorkspace || '')
+
+  const applyWorkspace = () => {
+    const ws = wsInput.trim()
+    setActiveWorkspace(ws || null)
+    // Reload so all data refetches under the new workspace header.
+    window.location.reload()
+  }
 
   const versionDisplay = (coreVersion && apiVersion)
     ? `${coreVersion}/${apiVersion}`
@@ -124,6 +133,20 @@ export default function SiteHeader() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+          )}
+          {role === 'admin' && (
+            <input
+              type="text"
+              value={wsInput}
+              onChange={(e) => setWsInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applyWorkspace()
+              }}
+              onBlur={applyWorkspace}
+              placeholder={t('header.workspacePlaceholder', 'workspace')}
+              title={t('header.workspaceSwitcher', 'Admin: act on this workspace (blank = default)')}
+              className="h-7 w-32 rounded-md border border-border/60 bg-background px-2 text-xs"
+            />
           )}
           <AppSettings />
           {!isGuestMode && (
