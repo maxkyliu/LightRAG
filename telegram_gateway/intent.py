@@ -21,6 +21,7 @@ COMMANDS = {
     "invite",
     "leave",
     "whoami",
+    "webui",
     "ingest",
     "end",
     "private",

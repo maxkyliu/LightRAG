@@ -52,7 +52,11 @@ from lightrag.utils import (
     generate_track_id,
     move_file_to_parsed_dir,
 )
-from lightrag.api.utils_api import get_combined_auth_dependency, get_rag_for_request
+from lightrag.api.utils_api import (
+    get_combined_auth_dependency,
+    get_rag_for_request,
+    require_write_access,
+)
 from ..config import global_args
 
 
@@ -2390,7 +2394,9 @@ def create_document_routes(
     combined_auth = get_combined_auth_dependency(api_key)
 
     @router.post(
-        "/scan", response_model=ScanResponse, dependencies=[Depends(combined_auth)]
+        "/scan",
+        response_model=ScanResponse,
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def scan_for_new_documents(
         background_tasks: BackgroundTasks, rag=Depends(get_rag_for_request)
@@ -2515,7 +2521,9 @@ def create_document_routes(
         )
 
     @router.post(
-        "/upload", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
+        "/upload",
+        response_model=InsertResponse,
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def upload_to_input_dir(
         background_tasks: BackgroundTasks,
@@ -2766,7 +2774,9 @@ def create_document_routes(
                 await _release_enqueue_slot(rag)
 
     @router.post(
-        "/text", response_model=InsertResponse, dependencies=[Depends(combined_auth)]
+        "/text",
+        response_model=InsertResponse,
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def insert_text(
         request: InsertTextRequest,
@@ -2872,7 +2882,7 @@ def create_document_routes(
     @router.post(
         "/texts",
         response_model=InsertResponse,
-        dependencies=[Depends(combined_auth)],
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def insert_texts(
         request: InsertTextsRequest,
@@ -2996,7 +3006,9 @@ def create_document_routes(
                 await _release_enqueue_slot(rag)
 
     @router.delete(
-        "", response_model=ClearDocumentsResponse, dependencies=[Depends(combined_auth)]
+        "",
+        response_model=ClearDocumentsResponse,
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def clear_documents(rag=Depends(get_rag_for_request)):
         """
@@ -3438,7 +3450,7 @@ def create_document_routes(
     @router.delete(
         "/delete_document",
         response_model=DeleteDocByIdResponse,
-        dependencies=[Depends(combined_auth)],
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
         summary="Delete a document and all its associated data by its ID.",
     )
     async def delete_document(
@@ -3533,7 +3545,7 @@ def create_document_routes(
     @router.post(
         "/clear_cache",
         response_model=ClearCacheResponse,
-        dependencies=[Depends(combined_auth)],
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def clear_cache(
         request: ClearCacheRequest, rag=Depends(get_rag_for_request)
@@ -3856,7 +3868,7 @@ def create_document_routes(
     @router.post(
         "/reprocess_failed",
         response_model=ReprocessResponse,
-        dependencies=[Depends(combined_auth)],
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def reprocess_failed_documents(
         background_tasks: BackgroundTasks, rag=Depends(get_rag_for_request)
@@ -3904,7 +3916,7 @@ def create_document_routes(
     @router.post(
         "/cancel_pipeline",
         response_model=CancelPipelineResponse,
-        dependencies=[Depends(combined_auth)],
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
     )
     async def cancel_pipeline(rag=Depends(get_rag_for_request)):
         """

@@ -39,7 +39,7 @@ import {
 } from '@/api/lightrag'
 import { errorMessage } from '@/lib/utils'
 import { toast } from 'sonner'
-import { useBackendState } from '@/stores/state'
+import { useBackendState, useAuthStore } from '@/stores/state'
 import { copyToClipboard } from '@/utils/clipboard'
 
 import { RefreshCwIcon, ActivityIcon, ArrowUpIcon, ArrowDownIcon, RotateCcwIcon, CheckSquareIcon, XIcon, AlertTriangle, Info, CopyIcon } from 'lucide-react'
@@ -393,6 +393,8 @@ export default function DocumentManager() {
 
   const [showPipelineStatus, setShowPipelineStatus] = useState(false)
   const { t, i18n } = useTranslation()
+  // Read-only (viewer) sessions hide write controls; the server also enforces 403.
+  const isViewer = useAuthStore((state) => state.role) === 'viewer'
   const health = useBackendState.use.health()
   const pipelineActive = useBackendState.use.pipelineActive()
 
@@ -1413,7 +1415,7 @@ export default function DocumentManager() {
           )}
 
           <div className="flex gap-2">
-            {isSelectionMode && (
+            {!isViewer && isSelectionMode && (
               <DeleteDocumentsDialog
                 selectedDocIds={selectedDocIds}
                 onDocumentsDeleted={handleDocumentsDeleted}
@@ -1436,13 +1438,15 @@ export default function DocumentManager() {
                   </Button>
                 );
               })()
-            ) : !isSelectionMode ? (
+            ) : !isSelectionMode && !isViewer ? (
               <ClearDocumentsDialog onDocumentsCleared={handleDocumentsCleared} />
             ) : null}
-            <UploadDocumentsDialog
-              onUploadBatchAccepted={() => startActivityProbe('upload')}
-              onDocumentsUploaded={async () => { refreshDocumentsThrottled() }}
-            />
+            {!isViewer && (
+              <UploadDocumentsDialog
+                onUploadBatchAccepted={() => startActivityProbe('upload')}
+                onDocumentsUploaded={async () => { refreshDocumentsThrottled() }}
+              />
+            )}
             <PipelineStatusDialog
               open={showPipelineStatus}
               onOpenChange={setShowPipelineStatus}

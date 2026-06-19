@@ -45,6 +45,7 @@ HELP_TEXT = (
     "• `/join <code>` — join a team with an invite code\n"
     "• `/invite` — (owner) get/rotate the invite code\n"
     "• `/whoami` — show your team and role\n"
+    "• `/webui` — (owner) open a read-only web view of the KB\n"
     "• `/leave` — leave (owner leaving deletes the team)\n\n"
     "*Using it*\n"
     "• Just send a message (text/voice/image) to *ask* a question.\n"
@@ -200,6 +201,39 @@ async def _handle_command(name: str, args: str, update: Update, context) -> None
             update,
             f"Team `{identity.membership.team_id}` · role *{identity.membership.role}* "
             f"· workspace `{identity.workspace}`",
+        )
+        return
+
+    if name == "webui":
+        identity = svc.identity.resolve(user_id)
+        if not identity:
+            await _reply(
+                update,
+                "You are not in a team yet. Use /createteam or /join.",
+                markdown=False,
+            )
+            return
+        if not identity.is_owner:
+            await _reply(
+                update, "Only the team owner can open the web view.", markdown=False
+            )
+            return
+        try:
+            token = await svc.client.mint_viewer_token(
+                identity.workspace, svc.config.webui_token_ttl_minutes
+            )
+        except LightRAGError as e:
+            logger.warning("mint viewer token failed: %s", e)
+            await _reply(
+                update, "Couldn't create a web login link right now.", markdown=False
+            )
+            return
+        link = f"{svc.config.webui_url}/webui#token={token}"
+        await _reply(
+            update,
+            f"🔐 Read-only web view for your team (expires in "
+            f"{svc.config.webui_token_ttl_minutes} min):\n{link}",
+            markdown=False,
         )
         return
 
