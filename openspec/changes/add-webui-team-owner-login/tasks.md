@@ -31,6 +31,17 @@
 
 ## 6. Verify
 
-- [ ] 6.1 E2E: owner `/webui` → read-only, own-workspace session; cannot mutate or switch
-- [ ] 6.2 E2E: admin logs in → switches to a team workspace → ingest/delete works → audit entry written
-- [ ] 6.3 Confirm no-token / default-workspace behavior is unchanged (backward compatible)
+- [~] 6.1 E2E owner `/webui` read-only: mint endpoint verified live (returns role=viewer + metadata.workspace); enforcement (lock + 403) covered by 20 unit tests. Full live owner flow blocked in this deployment — see "Deployment requirement" below.
+- [~] 6.2 E2E admin RW + audit: **audit verified live** (denied 401 viewer attempt AND 200 anon write both logged). Admin login + switcher need `AUTH_ACCOUNTS` configured to test live.
+- [x] 6.3 Backward compatible: confirmed live — anonymous write under a header workspace → 200, default behavior unchanged.
+
+## Deployment requirement (found during e2e)
+
+The viewer/admin feature needs LightRAG **out of guest mode**, otherwise
+`combined_auth` rejects non-guest bearer tokens (viewer/admin) with 401 *before*
+enforcement runs. To make the magic-link + admin flow work end-to-end, set on
+LightRAG: `AUTH_ACCOUNTS=<admin:pass>`, `TOKEN_SECRET=<random>`, and a
+`LIGHTRAG_API_KEY` so the gateway can authenticate to `/auth/mint-viewer-token`;
+set the same `LIGHTRAG_API_KEY` in the gateway `.env`. (Guest mode confirmed:
+mint works, audit works, backward-compat holds; viewer tokens 401 at the auth
+layer.)
