@@ -24,6 +24,7 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
+    Request,
     UploadFile,
 )
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -55,7 +56,9 @@ from lightrag.utils import (
 from lightrag.api.utils_api import (
     get_combined_auth_dependency,
     get_rag_for_request,
+    require_storage_quota,
     require_write_access,
+    resolve_effective_workspace,
 )
 from ..config import global_args
 
@@ -2396,7 +2399,11 @@ def create_document_routes(
     @router.post(
         "/scan",
         response_model=ScanResponse,
-        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+        dependencies=[
+            Depends(combined_auth),
+            Depends(require_write_access),
+            Depends(require_storage_quota),
+        ],
     )
     async def scan_for_new_documents(
         background_tasks: BackgroundTasks, rag=Depends(get_rag_for_request)
@@ -2523,9 +2530,14 @@ def create_document_routes(
     @router.post(
         "/upload",
         response_model=InsertResponse,
-        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+        dependencies=[
+            Depends(combined_auth),
+            Depends(require_write_access),
+            Depends(require_storage_quota),
+        ],
     )
     async def upload_to_input_dir(
+        request: Request,
         background_tasks: BackgroundTasks,
         file: UploadFile = File(...),
         rag=Depends(get_rag_for_request),
@@ -2653,6 +2665,27 @@ def create_document_routes(
                         f"File size not available in UploadFile for {safe_filename}, will check during streaming"
                     )
 
+            # Per-tier single-upload cap (multi-tenancy quotas). Applies only to
+            # named team workspaces; the default workspace is exempt.
+            quota = getattr(request.app.state, "quota", None)
+            workspace = resolve_effective_workspace(request)
+            if quota is not None and workspace is not None:
+                limits = quota.limits_for(workspace)
+                upload_size = getattr(file, "size", None)
+                if (
+                    limits.upload_capped
+                    and upload_size is not None
+                    and upload_size > limits.max_upload_bytes
+                ):
+                    raise HTTPException(
+                        status_code=413,
+                        detail=(
+                            "File exceeds this team's per-upload limit "
+                            f"({limits.max_upload_bytes / 1024 / 1024:.1f}MB); "
+                            f"uploaded: {upload_size / 1024 / 1024:.1f}MB."
+                        ),
+                    )
+
             file_path = doc_manager.input_dir / safe_filename
 
             # Strict name pre-check.  Both the INPUT directory and doc_status
@@ -2776,7 +2809,11 @@ def create_document_routes(
     @router.post(
         "/text",
         response_model=InsertResponse,
-        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+        dependencies=[
+            Depends(combined_auth),
+            Depends(require_write_access),
+            Depends(require_storage_quota),
+        ],
     )
     async def insert_text(
         request: InsertTextRequest,
@@ -2882,7 +2919,11 @@ def create_document_routes(
     @router.post(
         "/texts",
         response_model=InsertResponse,
-        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+        dependencies=[
+            Depends(combined_auth),
+            Depends(require_write_access),
+            Depends(require_storage_quota),
+        ],
     )
     async def insert_texts(
         request: InsertTextsRequest,

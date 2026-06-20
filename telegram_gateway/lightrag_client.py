@@ -18,6 +18,19 @@ class LightRAGError(RuntimeError):
     """Raised when a LightRAG API call fails."""
 
 
+class QuotaExceededError(LightRAGError):
+    """Raised when a request is rejected for exceeding a team resource quota.
+
+    Subclasses :class:`LightRAGError` so existing handlers still catch it, while
+    carrying the server's human-readable detail for surfacing to the user.
+    """
+
+    def __init__(self, message: str, kind: str = "quota") -> None:
+        super().__init__(message)
+        self.user_message = message
+        self.kind = kind  # "storage" (413) or "enquiry" (429)
+
+
 class LightRAGClient:
     def __init__(
         self,
@@ -48,6 +61,14 @@ class LightRAGClient:
                 resp = await client.request(method, url, headers=headers, **kwargs)
         except httpx.HTTPError as e:
             raise LightRAGError(f"LightRAG request failed: {e}") from e
+        if resp.status_code in (413, 429):
+            # Team resource quota exceeded — surface the server's friendly detail.
+            try:
+                detail = resp.json().get("detail")
+            except Exception:
+                detail = None
+            kind = "storage" if resp.status_code == 413 else "enquiry"
+            raise QuotaExceededError(detail or "Team resource quota reached.", kind)
         if resp.status_code >= 400:
             raise LightRAGError(
                 f"LightRAG {method} {path} -> {resp.status_code}: {resp.text[:500]}"

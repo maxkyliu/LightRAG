@@ -717,6 +717,36 @@ def parse_args() -> argparse.Namespace:
         "MAX_UPLOAD_SIZE", 104857600, int, special_none=True
     )
 
+    # ---- Per-team resource quotas (multi-tenancy) ----
+    # SQLite store for tier assignments + monthly query counters. Defaults to a
+    # file alongside the working dir when unset (resolved at store init).
+    args.quota_db_path = get_env_value("QUOTA_DB_PATH", None, special_none=True)
+    # Tier limits. 0 / unset on a field means "no cap" for that field; the
+    # `unlimited` tier has no caps at all. Storage is metered as source-content
+    # length (see lightrag/api/quota.py); enquiries are per calendar month (UTC).
+    args.quota_tiers = {
+        "normal": {
+            "storage_mb": get_env_value("QUOTA_TIER_NORMAL_STORAGE_MB", 100, int),
+            "queries": get_env_value("QUOTA_TIER_NORMAL_QUERIES", 1000, int),
+            "max_docs": get_env_value("QUOTA_TIER_NORMAL_MAX_DOCS", 500, int),
+            "max_upload_mb": get_env_value("QUOTA_TIER_NORMAL_MAX_UPLOAD_MB", 20, int),
+        },
+        "advance": {
+            "storage_mb": get_env_value("QUOTA_TIER_ADVANCE_STORAGE_MB", 2048, int),
+            "queries": get_env_value("QUOTA_TIER_ADVANCE_QUERIES", 20000, int),
+            "max_docs": get_env_value("QUOTA_TIER_ADVANCE_MAX_DOCS", 10000, int),
+            "max_upload_mb": get_env_value(
+                "QUOTA_TIER_ADVANCE_MAX_UPLOAD_MB", 200, int
+            ),
+        },
+        "unlimited": {
+            "storage_mb": 0,
+            "queries": 0,
+            "max_docs": 0,
+            "max_upload_mb": 0,
+        },
+    }
+
     # Embedding prefix configuration for context-aware embeddings. Empty prefixes
     # must be explicit via NO_PREFIX so missing config is distinguishable.
     (

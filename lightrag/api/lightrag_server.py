@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 from lightrag.api.utils_api import (
     get_combined_auth_dependency,
     require_write_access,
+    resolve_effective_workspace,
     display_splash_screen,
     check_env_file,
 )
@@ -62,6 +63,7 @@ from lightrag.parser.external.mineru.cache import MinerUParserOptions
 from lightrag.api.routers.query_routes import create_query_routes
 from lightrag.api.routers.graph_routes import create_graph_routes
 from lightrag.api.workspace_registry import WorkspaceRAGRegistry
+from lightrag.api.quota import QuotaStore
 from lightrag.api.routers.ollama_api import OllamaAPI
 
 from lightrag.utils import logger, set_verbose_debug
@@ -2135,6 +2137,12 @@ def create_app(args):
     app.state.rag = rag
     app.state.workspace_registry = workspace_registry
 
+    # Per-team resource quotas: tier assignments + monthly query counters.
+    # Storage is live-computed from each workspace's doc-status store, so there
+    # is no backfill. Path defaults to a file alongside the working dir.
+    quota_db_path = args.quota_db_path or os.path.join(args.working_dir, "quota.db")
+    app.state.quota = QuotaStore(quota_db_path, args.quota_tiers)
+
     # Add routes
     # root_path is set on the app for reverse proxy support;
     # routes stay at their natural paths and are prefixed by the proxy or uvicorn --root-path
@@ -2283,6 +2291,102 @@ def create_app(args):
             "workspace": ws,
             "expires_in_minutes": ttl,
         }
+
+    # ---- Per-team resource quotas ----
+    async def _usage_payload(quota, ws: str, rag_instance) -> dict:
+        """Tier + storage (live) + monthly enquiry usage for one workspace."""
+        from lightrag.api.quota import current_period
+
+        limits = quota.limits_for(ws)
+        storage = await quota.compute_storage(rag_instance)
+        return {
+            "workspace": ws,
+            "tier": quota.get_tier(ws),
+            "period": current_period(),
+            "storage": {
+                "used_bytes": storage.used_bytes,
+                "limit_bytes": limits.storage_bytes if limits.storage_capped else None,
+                "doc_count": storage.doc_count,
+                "doc_limit": limits.max_docs if limits.docs_capped else None,
+            },
+            "enquiries": {
+                "used": quota.get_query_count(ws),
+                "limit": limits.queries if limits.queries_capped else None,
+            },
+        }
+
+    @app.get("/usage", dependencies=[Depends(combined_auth)])
+    async def get_usage(request: Request):
+        """Resource usage (tier, storage, monthly enquiries) for the requesting workspace."""
+        quota = getattr(request.app.state, "quota", None)
+        if quota is None:
+            raise HTTPException(status_code=404, detail="Quotas are not enabled")
+        ws = resolve_effective_workspace(request) or (args.workspace or "default")
+        registry = getattr(request.app.state, "workspace_registry", None)
+        rag_instance = (
+            await registry.get(resolve_effective_workspace(request))
+            if registry is not None
+            else request.app.state.rag
+        )
+        return await _usage_payload(quota, ws, rag_instance)
+
+    @app.get(
+        "/admin/quotas",
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+    )
+    async def list_quotas(request: Request):
+        """Admin: list workspaces with their tier and live usage."""
+        quota = getattr(request.app.state, "quota", None)
+        if quota is None:
+            raise HTTPException(status_code=404, detail="Quotas are not enabled")
+        registry = getattr(request.app.state, "workspace_registry", None)
+        # Union of workspaces seen so far (built instances) and explicit assignments.
+        names = set(quota.all_tiers().keys())
+        if registry is not None:
+            names.update(registry.instances().keys())
+        default_ws = args.workspace or ""
+        names.discard(default_ws)
+        names.discard("")
+        items = []
+        for ws in sorted(names):
+            rag_instance = (
+                await registry.get(ws)
+                if registry is not None
+                else request.app.state.rag
+            )
+            items.append(await _usage_payload(quota, ws, rag_instance))
+        return {"workspaces": items, "tiers": list(args.quota_tiers.keys())}
+
+    @app.post(
+        "/admin/quotas/{workspace}",
+        dependencies=[Depends(combined_auth), Depends(require_write_access)],
+    )
+    async def set_quota_tier(
+        request: Request,
+        workspace: str,
+        tier: str = Body(..., embed=True),
+    ):
+        """Admin: assign a workspace's tier."""
+        quota = getattr(request.app.state, "quota", None)
+        if quota is None:
+            raise HTTPException(status_code=404, detail="Quotas are not enabled")
+        ws = re.sub(r"[^a-zA-Z0-9_]", "_", (workspace or "").strip())
+        if not ws:
+            raise HTTPException(status_code=400, detail="workspace is required")
+        try:
+            quota.set_tier(ws, tier)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        principal = getattr(request.state, "token_info", None) or {}
+        audit_log(
+            actor=principal.get("sub") or principal.get("username") or "admin",
+            role=principal.get("role"),
+            action="set_tier",
+            workspace=ws,
+            tier=tier,
+            status="ok",
+        )
+        return {"workspace": ws, "tier": tier}
 
     @app.get(
         "/health",

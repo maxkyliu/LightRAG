@@ -29,7 +29,7 @@ from .db import Datastore
 from .fetcher import FetchError, fetch_public_url
 from .identity import IdentityService, OnboardingError, ResolvedIdentity
 from .intent import extract_first_url, parse_command
-from .lightrag_client import LightRAGClient, LightRAGError
+from .lightrag_client import LightRAGClient, LightRAGError, QuotaExceededError
 from .media import MediaError, MediaService
 from .sessions import SessionService
 from .summarizer import Summarizer
@@ -381,6 +381,9 @@ async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             await _do_ingest(update, context, identity, payload_text)
         else:
             await _do_query(update, context, identity, payload_text)
+    except QuotaExceededError as e:
+        logger.info("Quota exceeded (%s): %s", e.kind, e.user_message)
+        await _reply(update, e.user_message, markdown=False)
     except LightRAGError as e:
         logger.warning("LightRAG error: %s", e)
         if "already contains" in str(e) or "-> 409" in str(e):
