@@ -55,7 +55,7 @@ function TabsNavigation() {
 
 export default function SiteHeader() {
   const { t } = useTranslation()
-  const { isGuestMode, coreVersion, apiVersion, username, webuiTitle, webuiDescription, role, activeWorkspace, setActiveWorkspace } = useAuthStore()
+  const { isGuestMode, username, webuiTitle, webuiDescription, role, activeWorkspace, setActiveWorkspace } = useAuthStore()
   const [wsInput, setWsInput] = useState(activeWorkspace || '')
 
   const applyWorkspace = () => {
@@ -64,16 +64,6 @@ export default function SiteHeader() {
     // Reload so all data refetches under the new workspace header.
     window.location.reload()
   }
-
-  const versionDisplay = (coreVersion && apiVersion)
-    ? `${coreVersion}/${apiVersion}`
-    : null;
-
-  // Check if frontend needs rebuild (apiVersion ends with warning symbol)
-  const hasWarning = apiVersion?.endsWith('⚠️');
-  const versionTooltip = hasWarning
-    ? t('header.frontendNeedsRebuild')
-    : versionDisplay ? `v${versionDisplay}` : '';
 
   const handleLogout = () => {
     navigationService.navigateToLogin();
@@ -118,20 +108,6 @@ export default function SiteHeader() {
 
       <nav className="w-[200px] flex items-center justify-end">
         <div className="flex items-center gap-2">
-          {versionDisplay && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 mr-1 cursor-default">
-                    v{versionDisplay}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {versionTooltip}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
           <UsageIndicator />
           <QuotaAdminPanel />
           {role === 'admin' && (
