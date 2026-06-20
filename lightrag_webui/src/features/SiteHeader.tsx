@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { navigationService } from '@/services/navigation'
 import { ZapIcon, LogOutIcon } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip'
+import { UsageIndicator, QuotaAdminPanel } from '@/features/QuotaManager'
 
 interface NavigationTabProps {
   value: string
@@ -46,9 +47,6 @@ function TabsNavigation() {
         </NavigationTab>
         <NavigationTab value="retrieval" currentTab={currentTab}>
           {t('header.retrieval')}
-        </NavigationTab>
-        <NavigationTab value="api" currentTab={currentTab}>
-          {t('header.api')}
         </NavigationTab>
       </TabsList>
     </div>
@@ -134,6 +132,8 @@ export default function SiteHeader() {
               </Tooltip>
             </TooltipProvider>
           )}
+          <UsageIndicator />
+          <QuotaAdminPanel />
           {role === 'admin' && (
             <input
               type="text"

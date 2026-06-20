@@ -11,7 +11,7 @@ import asyncio
 from lightrag import LightRAG, QueryParam
 from lightrag.constants import DEFAULT_QUERY_PRIORITY
 from lightrag.utils import TiktokenTokenizer
-from lightrag.api.utils_api import get_combined_auth_dependency
+from lightrag.api.utils_api import get_combined_auth_dependency, require_query_quota
 from fastapi import Depends
 
 
@@ -284,7 +284,9 @@ class OllamaAPI:
             )
 
         @self.router.post(
-            "/generate", dependencies=[Depends(combined_auth)], include_in_schema=True
+            "/generate",
+            dependencies=[Depends(combined_auth), Depends(require_query_quota)],
+            include_in_schema=True,
         )
         async def generate(raw_request: Request):
             """Handle generate completion requests acting as an Ollama model
@@ -472,7 +474,9 @@ class OllamaAPI:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.router.post(
-            "/chat", dependencies=[Depends(combined_auth)], include_in_schema=True
+            "/chat",
+            dependencies=[Depends(combined_auth), Depends(require_query_quota)],
+            include_in_schema=True,
         )
         async def chat(raw_request: Request):
             """Process chat completion requests by acting as an Ollama model.

@@ -1283,3 +1283,48 @@ export const getDocumentStatusCounts = async (): Promise<StatusCountsResponse> =
   const response = await axiosInstance.get('/documents/status_counts')
   return response.data
 }
+
+// ---- Per-team resource quotas ----
+
+export type QuotaUsage = {
+  workspace: string
+  tier: string
+  period: string
+  storage: {
+    used_bytes: number
+    limit_bytes: number | null
+    doc_count: number
+    doc_limit: number | null
+  }
+  enquiries: {
+    used: number
+    limit: number | null
+  }
+}
+
+/** Resource usage for the active (header/token) workspace. */
+export const getUsage = async (): Promise<QuotaUsage> => {
+  const response = await axiosInstance.get('/usage')
+  return response.data
+}
+
+/** Admin: list workspaces with tier + live usage, and the available tier names. */
+export const getAdminQuotas = async (): Promise<{
+  workspaces: QuotaUsage[]
+  tiers: string[]
+}> => {
+  const response = await axiosInstance.get('/admin/quotas')
+  return response.data
+}
+
+/** Admin: assign a workspace's tier. */
+export const setWorkspaceTier = async (
+  workspace: string,
+  tier: string
+): Promise<{ workspace: string; tier: string }> => {
+  const response = await axiosInstance.post(
+    `/admin/quotas/${encodeURIComponent(workspace)}`,
+    { tier }
+  )
+  return response.data
+}

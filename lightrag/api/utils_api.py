@@ -120,6 +120,109 @@ async def require_write_access(request: Request) -> None:
         )
 
 
+# ========== Per-team resource quotas ==========
+# A super admin may exceed a team's caps (support access); for storage this is
+# naturally reflected (live count), for queries we simply don't charge the team.
+ROLE_ADMIN = "admin"
+
+
+def resolve_effective_workspace(request: Request) -> Optional[str]:
+    """Return the named workspace to meter for this request, or ``None`` to exempt.
+
+    Resolution mirrors ``get_rag_for_request`` (viewer → token workspace; else the
+    ``LIGHTRAG-WORKSPACE`` header). The server's *default* workspace is exempt, so
+    only named team workspaces are subject to quotas.
+    """
+    role, locked_workspace = _principal_role_and_workspace(request)
+    if role == ROLE_VIEWER and locked_workspace:
+        workspace = locked_workspace
+    else:
+        workspace = extract_workspace_from_request(request)
+
+    default_workspace = global_args.workspace or ""
+    if not workspace or workspace == default_workspace:
+        return None
+    return workspace
+
+
+async def require_storage_quota(request: Request) -> None:
+    """FastAPI dependency: reject ingest into a workspace at/over its storage cap.
+
+    Storage is the live sum of source-content length (see ``quota.compute_storage``).
+    A single-upload cap is enforced in the upload route where the file size is known.
+    """
+    workspace = resolve_effective_workspace(request)
+    if workspace is None:
+        return
+    quota = getattr(request.app.state, "quota", None)
+    if quota is None:
+        return
+
+    limits = quota.limits_for(workspace)
+    if not (limits.storage_capped or limits.docs_capped):
+        return  # unlimited tier
+    role, _ = _principal_role_and_workspace(request)
+    if role == ROLE_ADMIN:
+        return  # admin may exceed for support
+
+    registry = getattr(request.app.state, "workspace_registry", None)
+    if registry is None:
+        return
+    rag = await registry.get(workspace)
+    usage = await quota.compute_storage(rag)
+    if limits.storage_capped and usage.used_bytes >= limits.storage_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "Team storage quota reached "
+                f"({usage.used_bytes // (1024 * 1024)} MB used of "
+                f"{limits.storage_bytes // (1024 * 1024)} MB). "
+                "Delete documents or upgrade the team's tier."
+            ),
+        )
+    if limits.docs_capped and usage.doc_count >= limits.max_docs:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Team document quota reached ({usage.doc_count} of "
+                f"{limits.max_docs} documents)."
+            ),
+        )
+
+
+async def require_query_quota(request: Request) -> None:
+    """FastAPI dependency: enforce + count the monthly enquiry allowance.
+
+    Rejects with 429 when the workspace has reached its monthly cap; otherwise
+    counts this enquiry. The increment happens once the gate passes (i.e. the
+    request is being served); requests rejected before this point (auth, the 429
+    itself) are not charged. Admin support queries are not charged to the team.
+    """
+    workspace = resolve_effective_workspace(request)
+    if workspace is None:
+        return
+    quota = getattr(request.app.state, "quota", None)
+    if quota is None:
+        return
+
+    limits = quota.limits_for(workspace)
+    if not limits.queries_capped:
+        return  # unlimited tier
+    role, _ = _principal_role_and_workspace(request)
+    if role == ROLE_ADMIN:
+        return
+
+    if quota.get_query_count(workspace) >= limits.queries:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Team monthly enquiry quota reached "
+                f"({limits.queries} queries). It resets at the start of next month."
+            ),
+        )
+    quota.increment_query(workspace)
+
+
 # ========== Token Renewal Rate Limiting ==========
 # Cache to track last renewal time per user (username as key)
 # Format: {username: last_renewal_timestamp}
