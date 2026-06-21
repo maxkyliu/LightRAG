@@ -1,0 +1,41 @@
+SmartRAG — Trimmed Datastore + LLM API Cost Model
+Edit the INPUT cells (mostly column B; provider prices B13:D15; tiers B18:D19). Open in Excel or Google Sheets and formulas recompute. Prices are representative (early 2026) — verify live before pricing decisions.
+
+TOKEN ASSUMPTIONS,Value
+LLM input tokens / MB ingested,1500000
+LLM output tokens / MB ingested,350000
+Embedding tokens / MB ingested,350000
+LLM input tokens / query,12000
+LLM output tokens / query,1200
+Embedding tokens / query,1000
+
+PROVIDER PRICES ($ per 1M tokens),In,Out,Embed,$/MB ingest,$/query
+OpenAI (gpt-5.4-mini),0.25,2.00,0.13,=($B$5*B13+$B$6*C13+$B$7*D13)/1000000,=($B$8*B13+$B$9*C13+$B$10*D13)/1000000
+OpenRouter (Qwen2.5-72B / DeepSeek-V3),0.20,0.50,0.10,=($B$5*B14+$B$6*C14+$B$7*D14)/1000000,=($B$8*B14+$B$9*C14+$B$10*D14)/1000000
+Gemini 2.5 Flash (recommended),0.15,0.60,0.13,=($B$5*B15+$B$6*C15+$B$7*D15)/1000000,=($B$8*B15+$B$9*C15+$B$10*D15)/1000000
+
+TIER DEFINITIONS,Storage cap (MB),Queries/mo,Monthly incremental ingest %
+Normal,100,1000,10
+Advance,2000,20000,10
+
+FIXED PLATFORM INFRA ($/mo shared),58
+
+ONE-TIME FILL COST ($),OpenAI,OpenRouter,Gemini
+Normal (fill storage cap),=$B$18*$E$13,=$B$18*$E$14,=$B$18*$E$15
+Advance (fill storage cap),=$B$19*$E$13,=$B$19*$E$14,=$B$19*$E$15
+
+STEADY MONTHLY API COST / TEAM ($),OpenAI,OpenRouter,Gemini
+Normal,=($B$18*$D$18/100)*$E$13+$C$18*$F$13,=($B$18*$D$18/100)*$E$14+$C$18*$F$14,=($B$18*$D$18/100)*$E$15+$C$18*$F$15
+Advance,=($B$19*$D$19/100)*$E$13+$C$19*$F$13,=($B$19*$D$19/100)*$E$14+$C$19*$F$14,=($B$19*$D$19/100)*$E$15+$C$19*$F$15
+
+PLATFORM ROLL-UP (monthly opex)
+# Normal teams,10
+# Advance teams,3
+TOTAL $/mo (infra + teams),OpenAI,OpenRouter,Gemini
+,=$B$21+$B$32*$B$28+$B$33*$B$29,=$B$21+$B$32*$C$28+$B$33*$C$29,=$B$21+$B$32*$D$28+$B$33*$D$29
+
+NOTES
+Ingestion dominates total cost. Set MAX_GLEANING=0 to cut extraction ~35% (lower rows 5 and 6 by ~35%).
+Self-host embeddings (bge-m3): set row 7 and Embed prices D13:D15 to 0.
+Query context scales with CHUNK_TOP_K (default 20). Lower it to cut row 8 (LLM input / query).
+Prices change frequently — overwrite B13:D15 with live quotes. AWS infra swap: set B21 to ~95.
